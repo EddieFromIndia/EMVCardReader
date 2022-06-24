@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.2.32602.215
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EMVCardReader", "EMVCardReader\EMVCardReader.csproj", "{9BA21EE9-A5C0-4AE1-9D8E-DEBF8C0D6BDD}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9BA21EE9-A5C0-4AE1-9D8E-DEBF8C0D6BDD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9BA21EE9-A5C0-4AE1-9D8E-DEBF8C0D6BDD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9BA21EE9-A5C0-4AE1-9D8E-DEBF8C0D6BDD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9BA21EE9-A5C0-4AE1-9D8E-DEBF8C0D6BDD}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {C5F62A06-6BE1-40AD-8C40-7A6700DA11BC}
+	EndGlobalSection
+EndGlobal
