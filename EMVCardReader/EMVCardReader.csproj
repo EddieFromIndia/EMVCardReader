@@ -235,6 +235,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ADFModel.cs" />
+    <Compile Include="AIDList.cs" />
     <Compile Include="CardData.cs" />
     <Compile Include="Helpers.cs" />
     <Compile Include="Program.cs" />

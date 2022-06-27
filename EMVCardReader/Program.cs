@@ -4,6 +4,7 @@ using PCSC.Iso7816;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices.ComTypes;
 using System.Text;
 
 namespace EMVCardReader
@@ -38,85 +39,76 @@ namespace EMVCardReader
 
                     using (IsoReader isoReader = new IsoReader(context, name, SCardShareMode.Shared, SCardProtocol.Any, false))
                     {
+                        bool isCandidateGenerated = false;
                         SCardReaderState readerState = context.GetReaderStatus(name);
                         CardData.ColdATR = readerState.Atr;
-                        
+
                         Response response = SelectFileCommand(isoReader, Encoding.ASCII.GetBytes("1PAY.SYS.DDF1"));
-
-                        if (response.SW1 == 0x6A && response.SW2 == 0x81)
-                        {
-                            isoReader.Disconnect(SCardReaderDisposition.Reset);
-                            throw new Exception("Either the card is blocked or it does not support the SELECT command.");
-                        }
-
-                        if (response.SW1 == 0x6A && response.SW2 == 0x82)
-                        {
-                            isoReader.Disconnect(SCardReaderDisposition.Reset);
-                            throw new Exception("PSE not installed in this card.");
-                        }
-
-                        if (response.SW1 == 0x62 && response.SW2 == 0x83)
-                        {
-                            isoReader.Disconnect(SCardReaderDisposition.Reset);
-                            throw new Exception("PSE has been invalidated or blocked!");
-                        }
 
                         if (response.SW1 != 0x61 && !(response.SW1 == 0x90 && response.SW2 == 0x00))
                         {
-                            isoReader.Disconnect(SCardReaderDisposition.Reset);
-                            throw new Exception($"Error fetching PSE.\nResponse [SW1 SW2]: {response.SW1} {response.SW2}");
-                        }
-
-                        response = GetResponseCommand(isoReader, response.SW2);
-
-                        if (response.SW1 != 0x90 || response.SW2 != 0x00 || response.GetData()[0] != 0x6f)
-                        {
-                            isoReader.Disconnect(SCardReaderDisposition.Reset);
-                            throw new Exception($"FCI of DDF not found!\nResponse [SW1 SW2]: {response.SW1} {response.SW2}\nData: {response.GetData().ToArray()}");
-                        }
-
-                        CardData.FCIofDDF = response.GetData();
-
-                        EmvTlvList FCIofDDFTags = EmvTlvList.Parse(CardData.FCIofDDF);
-                        if (FCIofDDFTags[0].Children[1].Children[0].Tag.Hex != "88")
-                        {
-                            isoReader.Disconnect(SCardReaderDisposition.Reset);
-                            throw new Exception("No Application found in card!");
-                        }
-
-                        int sfi = FCIofDDFTags[0].Children[1].Children[0].Value.Bytes[0];
-
-                        do
-                        {
-                            response = ReadRecordCommand(isoReader, (byte)sfi, Helpers.SFItoP2(sfi));
-                            sfi++;
-
-                            if (response.SW1 == 0x6A && response.SW2 == 0x83)
+                            CardData.AvailableAIDs = GenerateCandidateList(isoReader);
+                            CardData.AvailableADFs.Add(new ADFModel()
                             {
-                                break;
-                            }
+                                AID = CardData.AvailableAIDs[CardData.AvailableAIDs.Count - 1]
+                            });
 
-                            if (response.SW1 != 0x6C)
+                            isCandidateGenerated = true;
+                        }
+
+                        if (!isCandidateGenerated)
+                        {
+                            response = GetResponseCommand(isoReader, response.SW2);
+
+                            if (response.SW1 != 0x90 || response.SW2 != 0x00 || response.GetData()[0] != 0x6f)
                             {
                                 isoReader.Disconnect(SCardReaderDisposition.Reset);
-                                throw new Exception($"Error fetching ADF.\nResponse [SW1 SW2]: {response.SW1} {response.SW2}");
+                                throw new Exception($"FCI of DDF not found!\nResponse [SW1 SW2]: {response.SW1} {response.SW2}\nData: {response.GetData().ToArray()}");
                             }
 
-                            response = ReadRecordCommand(isoReader, (byte)sfi, Helpers.SFItoP2(sfi), response.SW2);
+                            CardData.FCIofDDF = response.GetData();
 
-                            if (response.SW1 == 0x90 && response.SW2 == 0x00)
+                            EmvTlvList FCIofDDFTags = EmvTlvList.Parse(CardData.FCIofDDF);
+                            if (FCIofDDFTags[0].Children[1].Children[0].Tag.Hex != "88")
                             {
-                                byte[] ADF = response.GetData();
-                                CardData.AvailableAIDs.Add(Helpers.GetDataObject(ADF, new byte[] { 0x4f }));
-                                CardData.AvailableADFs.Add(new ADFModel()
-                                {
-                                    AID = CardData.AvailableAIDs[CardData.AvailableAIDs.Count - 1],
-                                    ADF = ADF,
-                                    SFI = sfi
-                                });
+                                isoReader.Disconnect(SCardReaderDisposition.Reset);
+                                throw new Exception("No Application found in card!");
                             }
 
-                        } while (true);
+                            int sfi = FCIofDDFTags[0].Children[1].Children[0].Value.Bytes[0];
+
+                            do
+                            {
+                                response = ReadRecordCommand(isoReader, (byte)sfi, Helpers.SFItoP2(sfi));
+                                sfi++;
+
+                                if (response.SW1 == 0x6A && response.SW2 == 0x83)
+                                {
+                                    break;
+                                }
+
+                                if (response.SW1 != 0x6C)
+                                {
+                                    isoReader.Disconnect(SCardReaderDisposition.Reset);
+                                    throw new Exception($"Error fetching ADF.\nResponse [SW1 SW2]: {response.SW1} {response.SW2}");
+                                }
+
+                                response = ReadRecordCommand(isoReader, (byte)sfi, Helpers.SFItoP2(sfi), response.SW2);
+
+                                if (response.SW1 == 0x90 && response.SW2 == 0x00)
+                                {
+                                    byte[] ADF = response.GetData();
+                                    CardData.AvailableAIDs.Add(Helpers.GetDataObject(ADF, new byte[] { 0x4f }));
+                                    CardData.AvailableADFs.Add(new ADFModel()
+                                    {
+                                        AID = CardData.AvailableAIDs[CardData.AvailableAIDs.Count - 1],
+                                        ADF = ADF,
+                                        SFI = sfi
+                                    });
+                                }
+
+                            } while (true);
+                        }
 
                         foreach (byte[] AID in CardData.AvailableAIDs)
                         {
@@ -318,7 +310,7 @@ namespace EMVCardReader
                 P2 = p2,
                 Le = le
             };
-            
+
             return isoReader.Transmit(command);
         }
 
@@ -337,20 +329,42 @@ namespace EMVCardReader
             return isoReader.Transmit(command);
         }
 
-        //private static Response GetDataCommand(IsoReader isoReader)
-        //{
-        //    CommandApdu command = new CommandApdu(IsoCase.Case4Short, isoReader.ActiveProtocol)
-        //    {
-        //        CLA = 0x80,
-        //        Instruction = InstructionCode.GetData,
-        //        P1 = 0x00,
-        //        P2 = 0x00,
-        //        Data = new byte[] { 0x9F, 0x36, 0x9F, 0x13, 0x9F, 0x17, 0x9F, 0x4D, 0x9F, 0x4F },
-        //        Le = 0x00
-        //    };
+        private static Response GetDataCommand(IsoReader isoReader)
+        {
+            CommandApdu command = new CommandApdu(IsoCase.Case4Short, isoReader.ActiveProtocol)
+            {
+                CLA = 0x80,
+                Instruction = InstructionCode.GetData,
+                P1 = 0x00,
+                P2 = 0x00,
+                Data = new byte[] { 0x9F, 0x36, 0x9F, 0x13, 0x9F, 0x17, 0x9F, 0x4D, 0x9F, 0x4F },
+                Le = 0x00
+            };
 
-        //    return isoReader.Transmit(command);
-        //}
+            return isoReader.Transmit(command);
+        }
+
+        private static List<byte[]> GenerateCandidateList(IsoReader isoReader)
+        {
+            List<byte[]> candidateList = new List<byte[]>();
+
+            foreach (string aid in AIDList.List)
+            {
+                Response response = SelectFileCommand(isoReader, Helpers.StringToByteArray(aid));
+
+                if (response.SW1 == 0x61 || (response.SW1 == 0x90 && response.SW2 == 0x00))
+                {
+                    response = GetResponseCommand(isoReader, response.SW2);
+
+                    if (response.SW1 == 0x90 || response.SW2 == 0x00)
+                    {
+                        candidateList.Add(Helpers.StringToByteArray(aid));
+                    }
+                }
+            }
+
+            return candidateList;
+        }
 
         private static void DisplayData()
         {
@@ -360,18 +374,21 @@ namespace EMVCardReader
             Console.WriteLine($"Cold ATR:   {Helpers.ByteArrayToHexString(CardData.ColdATR)}");
             Console.WriteLine();
 
-            EmvTlvList FCIofDDFTags = EmvTlvList.Parse(CardData.FCIofDDF);
-            Console.WriteLine($"APPLICATION #{Helpers.ByteArrayToHexString(CardData.FCIofDDF)}");
-            PrintFCI(FCIofDDFTags, 1);
-
-            foreach (ADFModel adf in CardData.AvailableADFs)
+            if (CardData.FCIofDDF != null)
             {
-                EmvTlvList ADFTags = EmvTlvList.Parse(adf.ADF);
-                Console.WriteLine("    File 1");
-                Console.WriteLine($"        Record {adf.SFI}");
-                PrintFCI(ADFTags, 3);
+                EmvTlvList FCIofDDFTags = EmvTlvList.Parse(CardData.FCIofDDF);
+                Console.WriteLine($"APPLICATION #{Helpers.ByteArrayToHexString(CardData.FCIofDDF)}");
+                PrintFCI(FCIofDDFTags, 1);
+
+                foreach (ADFModel adf in CardData.AvailableADFs)
+                {
+                    EmvTlvList ADFTags = EmvTlvList.Parse(adf.ADF);
+                    Console.WriteLine("    File 1");
+                    Console.WriteLine($"        Record {adf.SFI}");
+                    PrintFCI(ADFTags, 3);
+                }
+                Console.WriteLine();
             }
-            Console.WriteLine();
 
             foreach (ADFModel adf in CardData.AvailableADFs)
             {

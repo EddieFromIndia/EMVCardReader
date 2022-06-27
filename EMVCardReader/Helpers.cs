@@ -115,5 +115,23 @@ namespace EMVCardReader
         {
             return Convert.ToByte(Convert.ToString(b, 2).PadLeft(8, '0').Substring(0, 5), 2);
         }
+
+        public static byte[] StringToByteArray(string hex)
+        {
+            byte[] arr = new byte[hex.Length >> 1];
+
+            for (int i = 0; i < hex.Length >> 1; ++i)
+            {
+                arr[i] = (byte)((GetHexVal(hex[i << 1]) << 4) + (GetHexVal(hex[(i << 1) + 1])));
+            }
+
+            return arr;
+        }
+
+        public static int GetHexVal(char hex)
+        {
+            int val = (int)hex;
+            return val - (val < 58 ? 48 : (val < 97 ? 55 : 87));
+        }
     }
 }
