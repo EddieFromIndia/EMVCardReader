@@ -236,11 +236,13 @@ namespace EMVCardReader
                             }
                         }
 
-                        DisplayData();
-
-                        Console.ReadKey();
+                        //response = GetDataCommand(isoReader);
                     }
                 }
+
+                DisplayData();
+
+                Console.ReadKey();
             }
             catch (Exception e)
             {
@@ -334,6 +336,21 @@ namespace EMVCardReader
 
             return isoReader.Transmit(command);
         }
+
+        //private static Response GetDataCommand(IsoReader isoReader)
+        //{
+        //    CommandApdu command = new CommandApdu(IsoCase.Case4Short, isoReader.ActiveProtocol)
+        //    {
+        //        CLA = 0x80,
+        //        Instruction = InstructionCode.GetData,
+        //        P1 = 0x00,
+        //        P2 = 0x00,
+        //        Data = new byte[] { 0x9F, 0x36, 0x9F, 0x13, 0x9F, 0x17, 0x9F, 0x4D, 0x9F, 0x4F },
+        //        Le = 0x00
+        //    };
+
+        //    return isoReader.Transmit(command);
+        //}
 
         private static void DisplayData()
         {
@@ -436,9 +453,14 @@ namespace EMVCardReader
                         Console.WriteLine($"                Application Function 1.3:   Issuer Authentication is supported");
                     }
 
+                    if (value[6] == '1')
+                    {
+                        Console.WriteLine($"                Application Function 1.2:   On device cardholder verification is supported");
+                    }
+
                     if (value[7] == '1')
                     {
-                        Console.WriteLine($"                Application Function 1.1:   Combined DDA/AC Generation is supported");
+                        Console.WriteLine($"                Application Function 1.1:   CDA supported");
                     }
 
                     Console.WriteLine($"            (94) Application File Locator (AFL) ({tags[0].Length - 2} Bytes):   {tags[0].Value.Hex.Substring(2)}(H)");
