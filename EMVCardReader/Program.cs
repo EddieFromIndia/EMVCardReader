@@ -4,14 +4,13 @@ using PCSC.Iso7816;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices.ComTypes;
 using System.Text;
 
 namespace EMVCardReader
 {
     public class Program
     {
-        private static readonly byte[] defaultPDOL = new byte[] { 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+        private static readonly byte[] defaultPDOL = new byte[] { 0x83, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
         private static void Main()
         {
@@ -132,29 +131,32 @@ namespace EMVCardReader
                                 throw new Exception($"ADF with AID \"{AID}\" has been invalidated!");
                             }
 
-                            if (response.SW1 != 0x61)
+                            if (response.SW1 == 0x61)
+                            {
+                                response = GetResponseCommand(isoReader, response.SW2);
+
+                                if (response.SW1 != 0x90 || response.SW2 != 0x00 || response.GetData()[0] != 0x6f)
+                                {
+                                    isoReader.Disconnect(SCardReaderDisposition.Reset);
+                                    throw new Exception($"FCI of ADF with AID \"{AID}\" not found!\nResponse [SW1 SW2]: {response.SW1} {response.SW2}\nData: {response.GetData().ToArray()}");
+                                }
+
+                                CardData.AvailableADFs.FirstOrDefault(adf => adf.AID == AID).FCI = response.GetData();
+                            }
+                            else if (response.SW1 == 0x90 && response.SW2 == 0x00)
+                            {
+                                CardData.AvailableADFs.FirstOrDefault(adf => adf.AID == AID).FCI = response.GetData();
+                            }
+                            else
                             {
                                 isoReader.Disconnect(SCardReaderDisposition.Reset);
                                 throw new Exception($"Error fetching ADF with AID \"{AID}\".\nResponse [SW1 SW2]: {response.SW1} {response.SW2}");
                             }
 
-                            response = GetResponseCommand(isoReader, response.SW2);
-
-                            if (response.SW1 != 0x90 || response.SW2 != 0x00 || response.GetData()[0] != 0x6f)
-                            {
-                                isoReader.Disconnect(SCardReaderDisposition.Reset);
-                                throw new Exception($"FCI of ADF with AID \"{AID}\" not found!\nResponse [SW1 SW2]: {response.SW1} {response.SW2}\nData: {response.GetData().ToArray()}");
-                            }
-
-                            CardData.AvailableADFs.FirstOrDefault(adf => adf.AID == AID).FCI = response.GetData();
-
                             byte[] PDOL = Helpers.GetDataObject(response.GetData(), new byte[] { 0x9f, 0x38 });
                             CardData.AvailableADFs.FirstOrDefault(adf => adf.AID == AID).PDOL = PDOL;
 
-                            if (PDOL == null)
-                            {
-                                PDOL = defaultPDOL;
-                            }
+                            PDOL = BuildPdolDataBlock(PDOL);
 
                             response = GetProcessingOptionsCommand(isoReader, PDOL);
 
@@ -279,8 +281,7 @@ namespace EMVCardReader
                 Instruction = InstructionCode.SelectFile,
                 P1 = 0x04,
                 P2 = 0x00,
-                Data = data,
-                Le = 0x00
+                Data = data
             };
 
             return isoReader.Transmit(command);
@@ -314,6 +315,59 @@ namespace EMVCardReader
             return isoReader.Transmit(command);
         }
 
+        private static byte[] BuildPdolDataBlock(byte[] pdol)
+        {
+            if (pdol == null)
+            {
+                pdol = defaultPDOL;
+                return pdol;
+            }
+            else
+            {
+                byte[] data = new byte[] { 0x83, 0x00 };
+                EmvTlvList tlvs = EmvTagParser.ParseDol(pdol);
+                
+                foreach (EmvTlv tlv in tlvs)
+                {
+                    if (tlv.Tag.Hex == "9F66" && tlv.Length == 4)
+                    {
+                        // Terminal Transaction Qualifiers (VISA)
+                        data = Helpers.AddBytesToArray(data, new byte[] { 0x30, 0x00, 0x00, 0x00 });
+                    }
+                    else if (tlv.Tag.Hex == "9F1A" && tlv.Length == 2)
+                    {
+                        // Terminal country code
+                        data = Helpers.AddBytesToArray(data, new byte[] { 0x02, 0x50 });
+                    }
+                    else if (tlv.Tag.Hex == "5F2A" && tlv.Length == 2)
+                    {
+                        // Transaction currency code
+                        data = Helpers.AddBytesToArray(data, new byte[] { 0x09, 0x78 });
+                    }
+                    else if (tlv.Tag.Hex == "9A" && tlv.Length == 3)
+                    {
+                        // Transaction date
+                        data = Helpers.AddBytesToArray(data, Helpers.StringToByteArray(Helpers.StringToHex(DateTime.Now.ToString("yyMMdd"), false)));
+                    }
+                    else if (tlv.Tag.Hex == "9F37" && tlv.Length == 4)
+                    {
+                        // Transaction currency code
+                        data = Helpers.AddBytesToArray(data, new byte[] { 0xDE, 0xAD, 0xBE, 0xEF });
+                    }
+                    else
+                    {
+                        for (int i = 0; i < tlv.Length; i++)
+                        {
+                            data = Helpers.AddBytesToArray(data, new byte[] { 0x00 });
+                        }
+                    }
+                }
+
+                data[1] = (byte)(data.Length - 2);
+                return data;
+            }
+        }
+
         private static Response GetProcessingOptionsCommand(IsoReader isoReader, byte[] PDOL)
         {
             CommandApdu command = new CommandApdu(IsoCase.Case4Short, isoReader.ActiveProtocol)
@@ -322,8 +376,7 @@ namespace EMVCardReader
                 INS = 0xA8,
                 P1 = 0x00,
                 P2 = 0x00,
-                Data = Helpers.AddBytesToArray(PDOL, new byte[] { 0x83, (byte)PDOL.Length }),
-                Le = 0x00
+                Data = Helpers.AddBytesToArray(PDOL, new byte[] { 0x83, (byte)PDOL.Length })
             };
 
             return isoReader.Transmit(command);
@@ -337,8 +390,7 @@ namespace EMVCardReader
                 Instruction = InstructionCode.GetData,
                 P1 = 0x00,
                 P2 = 0x00,
-                Data = new byte[] { 0x9F, 0x36, 0x9F, 0x13, 0x9F, 0x17, 0x9F, 0x4D, 0x9F, 0x4F },
-                Le = 0x00
+                Data = new byte[] { 0x9F, 0x36, 0x9F, 0x13, 0x9F, 0x17, 0x9F, 0x4D, 0x9F, 0x4F }
             };
 
             return isoReader.Transmit(command);
