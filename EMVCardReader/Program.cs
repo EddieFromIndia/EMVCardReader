@@ -616,7 +616,6 @@ namespace EMVCardReader
 
         private static void DisplayData()
         {
-            Console.WriteLine();
             Console.WriteLine("________________________________________________________________");
             Console.WriteLine("SCANNED EMV DATA:");
             Console.WriteLine($"Cold ATR:   {Helpers.ByteArrayToHexString(CardData.ColdATR)}");
@@ -729,6 +728,9 @@ namespace EMVCardReader
                     PrintFCI(AEFTags, 3);
                 }
             }
+
+            Console.WriteLine("________________________________________________________________");
+            Console.WriteLine("Press any key to exit..");
         }
 
         private static void PrintFCI(EmvTlvList tags, int indentationLevel = 0)

@@ -37,7 +37,7 @@ namespace EMVCardReader
             { "81", new List<string>() { "Amount Authorised (Binary)", "Primitive", "String" } },
             { "82", new List<string>() { "Application Interchange Profile (AIP)", "Primitive", "ByteArray" } },
             { "83", new List<string>() { "Command Template", "Primitive", "ByteArray" } },
-            { "84", new List<string>() { "Dedicated File (DF) Name", "Primitive", "String" } },
+            { "84", new List<string>() { "Dedicated File (DF) Name", "Primitive", "ByteArray" } },
             { "86", new List<string>() { "Issuer Script Command", "Primitive", "String" } },
             { "87", new List<string>() { "Application Priority Indicator", "Primitive", "ByteArray" } },
             { "88", new List<string>() { "Short File Identifier (SFI)", "Primitive", "ByteArray" } },
