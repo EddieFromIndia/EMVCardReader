@@ -9,8 +9,7 @@ namespace EMVCardReader
         public static List<ADFModel> AvailableADFs = new List<ADFModel>();
         public static byte[] FCIofDDF;
 
-        public static List<byte[]> AvailableAIDsContactless = new List<byte[]>();
-        public static List<ADFModel> AvailableADFsContactless = new List<ADFModel>();
         public static byte[] FCIofDDFContactless;
+        public static List<ADFModel> AvailableADFsContactless = new List<ADFModel>();
     }
 }

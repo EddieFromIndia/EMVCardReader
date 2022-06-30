@@ -239,10 +239,10 @@ namespace EMVCardReader
 
                         if (response.SW1 != 0x61 && !(response.SW1 == 0x90 && response.SW2 == 0x00))
                         {
-                            CardData.AvailableAIDsContactless = GenerateCandidateList(isoReader);
+                            CardData.AvailableAIDs = GenerateCandidateList(isoReader);
                             CardData.AvailableADFsContactless.Add(new ADFModel()
                             {
-                                AID = CardData.AvailableAIDsContactless[CardData.AvailableAIDsContactless.Count - 1]
+                                AID = CardData.AvailableAIDs[CardData.AvailableAIDs.Count - 1]
                             });
 
                             isCandidateGenerated = true;
@@ -290,10 +290,10 @@ namespace EMVCardReader
                                 if (response.SW1 == 0x90 && response.SW2 == 0x00)
                                 {
                                     byte[] ADF = response.GetData();
-                                    CardData.AvailableAIDsContactless.Add(Helpers.GetDataObject(ADF, new byte[] { 0x4f }));
+                                    CardData.AvailableAIDs.Add(Helpers.GetDataObject(ADF, new byte[] { 0x4f }));
                                     CardData.AvailableADFsContactless.Add(new ADFModel()
                                     {
-                                        AID = CardData.AvailableAIDsContactless[CardData.AvailableAIDsContactless.Count - 1],
+                                        AID = CardData.AvailableAIDs[CardData.AvailableAIDs.Count - 1],
                                         ADF = ADF,
                                         SFI = sfi
                                     });
@@ -302,7 +302,7 @@ namespace EMVCardReader
                             } while (true);
                         }
 
-                        foreach (byte[] AID in CardData.AvailableAIDsContactless)
+                        foreach (byte[] AID in CardData.AvailableAIDs)
                         {
                             response = SelectFileCommand(isoReader, AID);
 
@@ -347,7 +347,7 @@ namespace EMVCardReader
                             }
 
                             byte[] PDOL = Helpers.GetDataObject(response.GetData(), new byte[] { 0x9f, 0x38 });
-                            CardData.AvailableADFsContactless.FirstOrDefault(adf => adf.AID == AID).PDOL = PDOL;
+                            CardData.AvailableADFs.FirstOrDefault(adf => adf.AID == AID).PDOL = PDOL;
 
                             PDOL = BuildPdolDataBlock(PDOL);
 
@@ -357,7 +357,7 @@ namespace EMVCardReader
                             {
                                 byte[] data = response.GetData();
 
-                                CardData.AvailableADFsContactless.FirstOrDefault(adf => adf.AID == AID).ProcessingOptions = data;
+                                CardData.AvailableADFs.FirstOrDefault(adf => adf.AID == AID).ProcessingOptions = data;
 
                                 // Loop through AFL Records
                                 byte[] AFL;
@@ -638,12 +638,55 @@ namespace EMVCardReader
                 Console.WriteLine();
             }
 
+            if (CardData.FCIofDDFContactless != null)
+            {
+                EmvTlvList FCIofDDFTags = EmvTlvList.Parse(CardData.FCIofDDFContactless);
+                Console.WriteLine($"APPLICATION #{Helpers.ByteArrayToHexString(CardData.FCIofDDFContactless)}");
+                PrintFCI(FCIofDDFTags, 1);
+
+                foreach (ADFModel adf in CardData.AvailableADFs)
+                {
+                    EmvTlvList ADFTags = EmvTlvList.Parse(adf.ADF);
+                    Console.WriteLine("    File 1");
+                    Console.WriteLine($"        Record {adf.SFI}");
+                    PrintFCI(ADFTags, 3);
+                }
+                Console.WriteLine();
+            }
+
             foreach (ADFModel adf in CardData.AvailableADFs)
             {
-                EmvTlvList ADFTags = EmvTlvList.Parse(adf.ADF);
+                if (adf.FCI == null || adf.FCI.Length == 0)
+                {
+                    continue;
+                }
+
+                EmvTlvList FCITags = EmvTlvList.Parse(adf.FCI);
                 Console.WriteLine($"APPLICATION #{Helpers.ByteArrayToHexString(adf.AID)}");
                 Console.WriteLine($"    Answer to SELECT:    {Helpers.ByteArrayToHexString(adf.FCI)}");
-                PrintFCI(ADFTags, 2);
+                PrintFCI(FCITags, 2);
+
+                if (adf.ProcessingOptions == null)
+                {
+                    continue;
+                }
+
+                EmvTlvList ProcessingOptionTags = EmvTlvList.Parse(adf.ProcessingOptions);
+                Console.WriteLine($"    Processing Options:    {Helpers.ByteArrayToHexString(adf.ProcessingOptions)}");
+                PrintProcessingOptions(ProcessingOptionTags, 2);
+            }
+
+            foreach (ADFModel adf in CardData.AvailableADFsContactless)
+            {
+                if (adf.FCI == null || adf.FCI.Length == 0)
+                {
+                    continue;
+                }
+
+                EmvTlvList FCITags = EmvTlvList.Parse(adf.FCI);
+                Console.WriteLine($"APPLICATION #{Helpers.ByteArrayToHexString(adf.AID)}");
+                Console.WriteLine($"    Answer to SELECT:    {Helpers.ByteArrayToHexString(adf.FCI)}");
+                PrintFCI(FCITags, 2);
 
                 if (adf.ProcessingOptions == null)
                 {
@@ -659,6 +702,27 @@ namespace EMVCardReader
             {
                 foreach (RecordModel aef in adf.AEFs)
                 {
+                    if (aef.FCI == null || aef.FCI.Length == 0)
+                    {
+                        continue;
+                    }
+
+                    EmvTlvList AEFTags = EmvTlvList.Parse(aef.FCI);
+                    Console.WriteLine($"    File {adf.SFI}");
+                    Console.WriteLine($"        Record {adf.AEFs.IndexOf(aef)}");
+                    PrintFCI(AEFTags, 3);
+                }
+            }
+
+            foreach (ADFModel adf in CardData.AvailableADFsContactless)
+            {
+                foreach (RecordModel aef in adf.AEFs)
+                {
+                    if (aef.FCI == null || aef.FCI.Length == 0)
+                    {
+                        continue;
+                    }
+
                     EmvTlvList AEFTags = EmvTlvList.Parse(aef.FCI);
                     Console.WriteLine($"    File {adf.SFI}");
                     Console.WriteLine($"        Record {adf.AEFs.IndexOf(aef)}");
