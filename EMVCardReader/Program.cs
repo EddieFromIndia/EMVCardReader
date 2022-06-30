@@ -48,10 +48,13 @@ namespace EMVCardReader
                         if (response.SW1 != 0x61 && !(response.SW1 == 0x90 && response.SW2 == 0x00))
                         {
                             CardData.AvailableAIDs = GenerateCandidateList(isoReader);
-                            CardData.AvailableADFs.Add(new ADFModel()
+                            foreach (var aid in CardData.AvailableAIDs)
                             {
-                                AID = CardData.AvailableAIDs[CardData.AvailableAIDs.Count - 1]
-                            });
+                                CardData.AvailableADFs.Add(new ADFModel()
+                                {
+                                    AID = aid
+                                });
+                            }
 
                             isCandidateGenerated = true;
                         }
@@ -237,18 +240,8 @@ namespace EMVCardReader
                         // For Contactless Applications
                         response = SelectFileCommand(isoReader, Encoding.ASCII.GetBytes("2PAY.SYS.DDF1"));
 
-                        if (response.SW1 != 0x61 && !(response.SW1 == 0x90 && response.SW2 == 0x00))
-                        {
-                            CardData.AvailableAIDs = GenerateCandidateList(isoReader);
-                            CardData.AvailableADFsContactless.Add(new ADFModel()
-                            {
-                                AID = CardData.AvailableAIDs[CardData.AvailableAIDs.Count - 1]
-                            });
 
-                            isCandidateGenerated = true;
-                        }
-
-                        if (!isCandidateGenerated)
+                        if (response.SW1 == 0x61 || (response.SW1 == 0x90 && response.SW2 == 0x00))
                         {
                             response = GetResponseCommand(isoReader, response.SW2);
 
