@@ -161,7 +161,7 @@ namespace EMVCardReader
 
                             response = GetProcessingOptionsCommand(isoReader, PDOL);
 
-                            if (response != null)
+                            if (response.SW1 != 0x90 || response.SW2 != 00)
                             {
                                 byte[] data = response.GetData();
 
@@ -353,7 +353,7 @@ namespace EMVCardReader
 
                             response = GetProcessingOptionsCommand(isoReader, PDOL);
 
-                            if (response != null)
+                            if (response.SW1 != 0x90 || response.SW2 != 00)
                             {
                                 byte[] data = response.GetData();
 
