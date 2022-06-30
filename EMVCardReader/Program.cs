@@ -42,6 +42,7 @@ namespace EMVCardReader
                         SCardReaderState readerState = context.GetReaderStatus(name);
                         CardData.ColdATR = readerState.Atr;
 
+                        // For Contact Applications
                         Response response = SelectFileCommand(isoReader, Encoding.ASCII.GetBytes("1PAY.SYS.DDF1"));
 
                         if (response.SW1 != 0x61 && !(response.SW1 == 0x90 && response.SW2 == 0x00))
@@ -160,73 +161,268 @@ namespace EMVCardReader
 
                             response = GetProcessingOptionsCommand(isoReader, PDOL);
 
-                            byte[] data = response.GetData();
-
-                            CardData.AvailableADFs.FirstOrDefault(adf => adf.AID == AID).ProcessingOptions = data;
-
-                            // Loop through AFL Records
-                            byte[] AFL;
-                            List<byte[]> AFLList = new List<byte[]>();
-
-                            if (data[0] == 0x80)
+                            if (response != null)
                             {
-                                AFL = data.Skip(4).ToArray();
+                                byte[] data = response.GetData();
+
+                                CardData.AvailableADFs.FirstOrDefault(adf => adf.AID == AID).ProcessingOptions = data;
+
+                                // Loop through AFL Records
+                                byte[] AFL;
+                                List<byte[]> AFLList = new List<byte[]>();
+
+                                if (data[0] == 0x80)
+                                {
+                                    AFL = data.Skip(4).ToArray();
+                                }
+                                else
+                                {
+                                    AFL = Helpers.GetDataObject(data, new byte[] { 0x94 });
+                                }
+
+                                AFLList = Helpers.SplitArray(AFL, 4);
+
+                                // Get Records from AFL
+                                foreach (byte[] afl in AFLList)
+                                {
+                                    int RecordNumber = afl[1];
+
+                                    do
+                                    {
+                                        response = ReadRecordCommand(isoReader, (byte)RecordNumber, Helpers.SFItoP2(RecordNumber));
+
+                                        if (response.SW1 == 0x6A && response.SW2 == 0x82)
+                                        {
+                                            isoReader.Disconnect(SCardReaderDisposition.Reset);
+                                            throw new Exception($"File not found for SFI {Helpers.ExtractSFI(afl[0])} and Record {RecordNumber}.\nResponse [SW1 SW2]: {response.SW1} {response.SW2}");
+                                        }
+
+                                        if (response.SW1 == 0x6A && response.SW2 == 0x83)
+                                        {
+                                            isoReader.Disconnect(SCardReaderDisposition.Reset);
+                                            throw new Exception($"Record {RecordNumber} not found for SFI {Helpers.ExtractSFI(afl[0])}.\nResponse [SW1 SW2]: {response.SW1} {response.SW2}");
+                                        }
+
+                                        if (response.SW1 != 0x6C)
+                                        {
+                                            isoReader.Disconnect(SCardReaderDisposition.Reset);
+                                            throw new Exception($"Error fetching AEF with AID: {AID} and AFL: {afl}.\nResponse [SW1 SW2]: {response.SW1} {response.SW2}");
+                                        }
+
+                                        response = ReadRecordCommand(isoReader, (byte)RecordNumber, Helpers.SFItoP2(RecordNumber), response.SW2);
+
+                                        if (response.SW1 == 0x6A && response.SW2 == 0x82)
+                                        {
+                                            isoReader.Disconnect(SCardReaderDisposition.Reset);
+                                            throw new Exception($"File not found for SFI {Helpers.ExtractSFI(afl[0])} and Record {RecordNumber}.\nResponse [SW1 SW2]: {response.SW1} {response.SW2}");
+                                        }
+
+                                        if (response.SW1 == 0x6A && response.SW2 == 0x83)
+                                        {
+                                            isoReader.Disconnect(SCardReaderDisposition.Reset);
+                                            throw new Exception($"Record {RecordNumber} not found for SFI {Helpers.ExtractSFI(afl[0])}.\nResponse [SW1 SW2]: {response.SW1} {response.SW2}");
+                                        }
+
+                                        if (response.SW1 == 0x90 && response.SW2 == 0x00)
+                                        {
+                                            byte[] FCI = response.GetData();
+                                            CardData.AvailableADFs.FirstOrDefault(adf => adf.AID == AID).AEFs.Add(new RecordModel() { AFL = afl, FCI = FCI });
+                                        }
+                                        RecordNumber++;
+                                    } while (RecordNumber <= afl[2]);
+                                }
+                            }
+                        }
+
+                        // For Contactless Applications
+                        response = SelectFileCommand(isoReader, Encoding.ASCII.GetBytes("2PAY.SYS.DDF1"));
+
+                        if (response.SW1 != 0x61 && !(response.SW1 == 0x90 && response.SW2 == 0x00))
+                        {
+                            CardData.AvailableAIDsContactless = GenerateCandidateList(isoReader);
+                            CardData.AvailableADFsContactless.Add(new ADFModel()
+                            {
+                                AID = CardData.AvailableAIDsContactless[CardData.AvailableAIDsContactless.Count - 1]
+                            });
+
+                            isCandidateGenerated = true;
+                        }
+
+                        if (!isCandidateGenerated)
+                        {
+                            response = GetResponseCommand(isoReader, response.SW2);
+
+                            if (response.SW1 != 0x90 || response.SW2 != 0x00 || response.GetData()[0] != 0x6f)
+                            {
+                                isoReader.Disconnect(SCardReaderDisposition.Reset);
+                                throw new Exception($"FCI of DDF not found!\nResponse [SW1 SW2]: {response.SW1} {response.SW2}\nData: {response.GetData().ToArray()}");
+                            }
+
+                            CardData.FCIofDDFContactless = response.GetData();
+
+                            EmvTlvList FCIofDDFTags = EmvTlvList.Parse(CardData.FCIofDDFContactless);
+                            if (FCIofDDFTags[0].Children[1].Children[0].Tag.Hex != "88")
+                            {
+                                isoReader.Disconnect(SCardReaderDisposition.Reset);
+                                throw new Exception("No Application found in card!");
+                            }
+
+                            int sfi = FCIofDDFTags[0].Children[1].Children[0].Value.Bytes[0];
+
+                            do
+                            {
+                                response = ReadRecordCommand(isoReader, (byte)sfi, Helpers.SFItoP2(sfi));
+                                sfi++;
+
+                                if (response.SW1 == 0x6A && response.SW2 == 0x83)
+                                {
+                                    break;
+                                }
+
+                                if (response.SW1 != 0x6C)
+                                {
+                                    isoReader.Disconnect(SCardReaderDisposition.Reset);
+                                    throw new Exception($"Error fetching ADF.\nResponse [SW1 SW2]: {response.SW1} {response.SW2}");
+                                }
+
+                                response = ReadRecordCommand(isoReader, (byte)sfi, Helpers.SFItoP2(sfi), response.SW2);
+
+                                if (response.SW1 == 0x90 && response.SW2 == 0x00)
+                                {
+                                    byte[] ADF = response.GetData();
+                                    CardData.AvailableAIDsContactless.Add(Helpers.GetDataObject(ADF, new byte[] { 0x4f }));
+                                    CardData.AvailableADFsContactless.Add(new ADFModel()
+                                    {
+                                        AID = CardData.AvailableAIDsContactless[CardData.AvailableAIDsContactless.Count - 1],
+                                        ADF = ADF,
+                                        SFI = sfi
+                                    });
+                                }
+
+                            } while (true);
+                        }
+
+                        foreach (byte[] AID in CardData.AvailableAIDsContactless)
+                        {
+                            response = SelectFileCommand(isoReader, AID);
+
+                            if (response.SW1 == 0x6A && response.SW2 == 0x81)
+                            {
+                                isoReader.Disconnect(SCardReaderDisposition.Reset);
+                                throw new Exception($"The ADF with AID \"{AID}\" cannot be selected.");
+                            }
+
+                            if (response.SW1 == 0x6A && response.SW2 == 0x82)
+                            {
+                                isoReader.Disconnect(SCardReaderDisposition.Reset);
+                                throw new Exception($"ADF with AID \"{AID}\" not found.");
+                            }
+
+                            if (response.SW1 == 0x62 && response.SW2 == 0x83)
+                            {
+                                isoReader.Disconnect(SCardReaderDisposition.Reset);
+                                throw new Exception($"ADF with AID \"{AID}\" has been invalidated!");
+                            }
+
+                            if (response.SW1 == 0x61)
+                            {
+                                response = GetResponseCommand(isoReader, response.SW2);
+
+                                if (response.SW1 != 0x90 || response.SW2 != 0x00 || response.GetData()[0] != 0x6f)
+                                {
+                                    isoReader.Disconnect(SCardReaderDisposition.Reset);
+                                    throw new Exception($"FCI of ADF with AID \"{AID}\" not found!\nResponse [SW1 SW2]: {response.SW1} {response.SW2}\nData: {response.GetData().ToArray()}");
+                                }
+
+                                CardData.AvailableADFsContactless.FirstOrDefault(adf => adf.AID == AID).FCI = response.GetData();
+                            }
+                            else if (response.SW1 == 0x90 && response.SW2 == 0x00)
+                            {
+                                CardData.AvailableADFsContactless.FirstOrDefault(adf => adf.AID == AID).FCI = response.GetData();
                             }
                             else
                             {
-                                AFL = Helpers.GetDataObject(data, new byte[] { 0x94 });
+                                isoReader.Disconnect(SCardReaderDisposition.Reset);
+                                throw new Exception($"Error fetching ADF with AID \"{AID}\".\nResponse [SW1 SW2]: {response.SW1} {response.SW2}");
                             }
 
-                            AFLList = Helpers.SplitArray(AFL, 4);
+                            byte[] PDOL = Helpers.GetDataObject(response.GetData(), new byte[] { 0x9f, 0x38 });
+                            CardData.AvailableADFsContactless.FirstOrDefault(adf => adf.AID == AID).PDOL = PDOL;
 
-                            // Get Records from AFL
-                            foreach (byte[] afl in AFLList)
+                            PDOL = BuildPdolDataBlock(PDOL);
+
+                            response = GetProcessingOptionsCommand(isoReader, PDOL);
+
+                            if (response != null)
                             {
-                                int RecordNumber = afl[1];
+                                byte[] data = response.GetData();
 
-                                do
+                                CardData.AvailableADFsContactless.FirstOrDefault(adf => adf.AID == AID).ProcessingOptions = data;
+
+                                // Loop through AFL Records
+                                byte[] AFL;
+                                List<byte[]> AFLList = new List<byte[]>();
+
+                                if (data[0] == 0x80)
                                 {
-                                    response = ReadRecordCommand(isoReader, (byte)RecordNumber, Helpers.SFItoP2(RecordNumber));
+                                    AFL = data.Skip(4).ToArray();
+                                }
+                                else
+                                {
+                                    AFL = Helpers.GetDataObject(data, new byte[] { 0x94 });
+                                }
 
-                                    if (response.SW1 == 0x6A && response.SW2 == 0x82)
+                                AFLList = Helpers.SplitArray(AFL, 4);
+
+                                // Get Records from AFL
+                                foreach (byte[] afl in AFLList)
+                                {
+                                    int RecordNumber = afl[1];
+
+                                    do
                                     {
-                                        isoReader.Disconnect(SCardReaderDisposition.Reset);
-                                        throw new Exception($"File not found for SFI {Helpers.ExtractSFI(afl[0])} and Record {RecordNumber}.\nResponse [SW1 SW2]: {response.SW1} {response.SW2}");
-                                    }
+                                        response = ReadRecordCommand(isoReader, (byte)RecordNumber, Helpers.SFItoP2(RecordNumber));
 
-                                    if (response.SW1 == 0x6A && response.SW2 == 0x83)
-                                    {
-                                        isoReader.Disconnect(SCardReaderDisposition.Reset);
-                                        throw new Exception($"Record {RecordNumber} not found for SFI {Helpers.ExtractSFI(afl[0])}.\nResponse [SW1 SW2]: {response.SW1} {response.SW2}");
-                                    }
+                                        if (response.SW1 == 0x6A && response.SW2 == 0x82)
+                                        {
+                                            isoReader.Disconnect(SCardReaderDisposition.Reset);
+                                            throw new Exception($"File not found for SFI {Helpers.ExtractSFI(afl[0])} and Record {RecordNumber}.\nResponse [SW1 SW2]: {response.SW1} {response.SW2}");
+                                        }
 
-                                    if (response.SW1 != 0x6C)
-                                    {
-                                        isoReader.Disconnect(SCardReaderDisposition.Reset);
-                                        throw new Exception($"Error fetching AEF with AID: {AID} and AFL: {afl}.\nResponse [SW1 SW2]: {response.SW1} {response.SW2}");
-                                    }
+                                        if (response.SW1 == 0x6A && response.SW2 == 0x83)
+                                        {
+                                            isoReader.Disconnect(SCardReaderDisposition.Reset);
+                                            throw new Exception($"Record {RecordNumber} not found for SFI {Helpers.ExtractSFI(afl[0])}.\nResponse [SW1 SW2]: {response.SW1} {response.SW2}");
+                                        }
 
-                                    response = ReadRecordCommand(isoReader, (byte)RecordNumber, Helpers.SFItoP2(RecordNumber), response.SW2);
+                                        if (response.SW1 != 0x6C)
+                                        {
+                                            isoReader.Disconnect(SCardReaderDisposition.Reset);
+                                            throw new Exception($"Error fetching AEF with AID: {AID} and AFL: {afl}.\nResponse [SW1 SW2]: {response.SW1} {response.SW2}");
+                                        }
 
-                                    if (response.SW1 == 0x6A && response.SW2 == 0x82)
-                                    {
-                                        isoReader.Disconnect(SCardReaderDisposition.Reset);
-                                        throw new Exception($"File not found for SFI {Helpers.ExtractSFI(afl[0])} and Record {RecordNumber}.\nResponse [SW1 SW2]: {response.SW1} {response.SW2}");
-                                    }
+                                        response = ReadRecordCommand(isoReader, (byte)RecordNumber, Helpers.SFItoP2(RecordNumber), response.SW2);
 
-                                    if (response.SW1 == 0x6A && response.SW2 == 0x83)
-                                    {
-                                        isoReader.Disconnect(SCardReaderDisposition.Reset);
-                                        throw new Exception($"Record {RecordNumber} not found for SFI {Helpers.ExtractSFI(afl[0])}.\nResponse [SW1 SW2]: {response.SW1} {response.SW2}");
-                                    }
+                                        if (response.SW1 == 0x6A && response.SW2 == 0x82)
+                                        {
+                                            isoReader.Disconnect(SCardReaderDisposition.Reset);
+                                            throw new Exception($"File not found for SFI {Helpers.ExtractSFI(afl[0])} and Record {RecordNumber}.\nResponse [SW1 SW2]: {response.SW1} {response.SW2}");
+                                        }
 
-                                    if (response.SW1 == 0x90 && response.SW2 == 0x00)
-                                    {
-                                        byte[] FCI = response.GetData();
-                                        CardData.AvailableADFs.FirstOrDefault(adf => adf.AID == AID).AEFs.Add(new RecordModel() { AFL = afl, FCI = FCI });
-                                    }
-                                    RecordNumber++;
-                                } while (RecordNumber <= afl[2]);
+                                        if (response.SW1 == 0x6A && response.SW2 == 0x83)
+                                        {
+                                            isoReader.Disconnect(SCardReaderDisposition.Reset);
+                                            throw new Exception($"Record {RecordNumber} not found for SFI {Helpers.ExtractSFI(afl[0])}.\nResponse [SW1 SW2]: {response.SW1} {response.SW2}");
+                                        }
+
+                                        if (response.SW1 == 0x90 && response.SW2 == 0x00)
+                                        {
+                                            byte[] FCI = response.GetData();
+                                            CardData.AvailableADFsContactless.FirstOrDefault(adf => adf.AID == AID).AEFs.Add(new RecordModel() { AFL = afl, FCI = FCI });
+                                        }
+                                        RecordNumber++;
+                                    } while (RecordNumber <= afl[2]);
+                                }
                             }
                         }
 
@@ -376,7 +572,7 @@ namespace EMVCardReader
                 INS = 0xA8,
                 P1 = 0x00,
                 P2 = 0x00,
-                Data = Helpers.AddBytesToArray(PDOL, new byte[] { 0x83, (byte)PDOL.Length })
+                Data = PDOL
             };
 
             return isoReader.Transmit(command);
@@ -448,6 +644,11 @@ namespace EMVCardReader
                 Console.WriteLine($"APPLICATION #{Helpers.ByteArrayToHexString(adf.AID)}");
                 Console.WriteLine($"    Answer to SELECT:    {Helpers.ByteArrayToHexString(adf.FCI)}");
                 PrintFCI(ADFTags, 2);
+
+                if (adf.ProcessingOptions == null)
+                {
+                    continue;
+                }
 
                 EmvTlvList ProcessingOptionTags = EmvTlvList.Parse(adf.ProcessingOptions);
                 Console.WriteLine($"    Processing Options:    {Helpers.ByteArrayToHexString(adf.ProcessingOptions)}");
