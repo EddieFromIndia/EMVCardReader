@@ -116,7 +116,7 @@ namespace EMVCardReader
             return Convert.ToByte(Convert.ToString(b, 2).PadLeft(8, '0').Substring(0, 5), 2);
         }
 
-        public static byte[] StringToByteArray(string hex)
+        public static byte[] HexStringToByteArray(string hex)
         {
             byte[] arr = new byte[hex.Length >> 1];
 

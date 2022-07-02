@@ -536,7 +536,7 @@ namespace EMVCardReader
                     else if (tlv.Tag.Hex == "9A" && tlv.Length == 3)
                     {
                         // Transaction date
-                        data = Helpers.AddBytesToArray(data, Helpers.StringToByteArray(Helpers.AsciiStringToHexString(DateTime.Now.ToString("yyMMdd"), false)));
+                        data = Helpers.AddBytesToArray(data, Helpers.HexStringToByteArray(Helpers.AsciiStringToHexString(DateTime.Now.ToString("yyMMdd"), false)));
                     }
                     else if (tlv.Tag.Hex == "9F37" && tlv.Length == 4)
                     {
@@ -591,7 +591,7 @@ namespace EMVCardReader
 
             foreach (string aid in AIDList.List)
             {
-                Response response = SelectFileCommand(isoReader, Helpers.StringToByteArray(aid));
+                Response response = SelectFileCommand(isoReader, Helpers.HexStringToByteArray(aid));
 
                 if (response.SW1 == 0x61 || (response.SW1 == 0x90 && response.SW2 == 0x00))
                 {
@@ -599,7 +599,7 @@ namespace EMVCardReader
 
                     if (response.SW1 == 0x90 || response.SW2 == 0x00)
                     {
-                        candidateList.Add(Helpers.StringToByteArray(aid));
+                        candidateList.Add(Helpers.HexStringToByteArray(aid));
                     }
                 }
             }
