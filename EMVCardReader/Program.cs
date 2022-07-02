@@ -536,7 +536,7 @@ namespace EMVCardReader
                     else if (tlv.Tag.Hex == "9A" && tlv.Length == 3)
                     {
                         // Transaction date
-                        data = Helpers.AddBytesToArray(data, Helpers.StringToByteArray(Helpers.StringToHex(DateTime.Now.ToString("yyMMdd"), false)));
+                        data = Helpers.AddBytesToArray(data, Helpers.StringToByteArray(Helpers.AsciiStringToHexString(DateTime.Now.ToString("yyMMdd"), false)));
                     }
                     else if (tlv.Tag.Hex == "9F37" && tlv.Length == 4)
                     {

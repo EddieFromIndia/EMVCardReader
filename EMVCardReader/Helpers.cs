@@ -78,14 +78,14 @@ namespace EMVCardReader
             return newArray;
         }
 
-        public static string HexToString(byte[] data)
+        public static string ByteArrayToAsciiString(byte[] data)
         {
             return Encoding.ASCII.GetString(data);
         }
 
-        public static string StringToHex(string str, bool hasSpaces)
+        public static string AsciiStringToHexString(string str, bool hasSpaces = false)
         {
-            string hexString = BitConverter.ToString(Encoding.Default.GetBytes(str));
+            string hexString = BitConverter.ToString(Encoding.Default.GetBytes(str.Trim().Replace(" ", "")));
             return hasSpaces ? hexString.Replace("-", " ") : hexString.Replace("-", "");
         }
 
