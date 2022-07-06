@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using EMVCardReader.Models;
 
 namespace EMVCardReader
 {
@@ -10,6 +11,6 @@ namespace EMVCardReader
         public static byte[] FCIofDDF;
 
         public static byte[] FCIofDDFContactless;
-        public static List<ADFModel> AvailableADFsContactless = new List<ADFModel>();
+        public static byte[] CPLC;
     }
 }

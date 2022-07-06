@@ -1,4 +1,4 @@
-﻿namespace EMVCardReader
+﻿namespace EMVCardReader.Models
 {
     public class RecordModel
     {
