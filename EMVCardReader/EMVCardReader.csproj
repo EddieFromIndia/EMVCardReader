@@ -237,6 +237,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Database\ATRList.cs" />
     <Compile Include="Models\ADFModel.cs" />
     <Compile Include="Database\AIDList.cs" />
     <Compile Include="Data\CardData.cs" />

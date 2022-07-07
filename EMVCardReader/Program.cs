@@ -1,4 +1,5 @@
-﻿using EMVCardReader.Models;
+﻿using EMVCardReader.Database;
+using EMVCardReader.Models;
 using Great.EmvTags;
 using Newtonsoft.Json;
 using PCSC;
@@ -6,6 +7,7 @@ using PCSC.Iso7816;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace EMVCardReader
 {
@@ -100,6 +102,37 @@ namespace EMVCardReader
                                 break;
                             case "2":
                                 // Check card type
+
+                                bool atrFound = false;
+                                using (IsoReader isoReader = new IsoReader(context, SelectedReader, SCardShareMode.Shared, SCardProtocol.Any, false))
+                                {
+                                    CardData.ColdATR = GetColdAtr(context);
+                                    foreach (List<string> item in ATRList.List)
+                                    {
+                                        Regex regex = new Regex(item[0]);
+                                        MatchCollection matches = regex.Matches(DataProcessor.ByteArrayToHexString(CardData.ColdATR, true).Replace(",", string.Empty));
+
+                                        if (matches.Count > 0)
+                                        {
+                                            atrFound = true;
+
+                                            Console.WriteLine();
+                                            Console.WriteLine("Possible Card Type/s:");
+                                            Console.WriteLine();
+                                            Console.WriteLine(item[1]);
+                                            Console.WriteLine();
+
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                if (!atrFound)
+                                {
+                                    Console.WriteLine();
+                                    Console.WriteLine("Card type cannot be determined.");
+                                    Console.WriteLine();
+                                }
                                 break;
                             case "3":
                                 // Get card details and display

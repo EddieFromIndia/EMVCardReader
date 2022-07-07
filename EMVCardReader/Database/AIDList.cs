@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace EMVCardReader
+namespace EMVCardReader.Database
 {
     public static class AIDList
     {
