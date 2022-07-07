@@ -18,6 +18,16 @@ namespace EMVCardReader
         }
 
         /// <summary>
+        /// Extracts the SFI from the byte. The first 5 bits of a byte represent the SFI.
+        /// </summary>
+        /// <param name="sfi"></param>
+        /// <returns>The SFI as a byte</returns>
+        public static byte ExtractSFI(byte sfi)
+        {
+            return (byte)Convert.ToInt32(Convert.ToString(sfi, 2).Substring(0, 5), 2);
+        }
+
+        /// <summary>
         /// Searches for the tag in the source.
         /// </summary>
         /// <param name="source"></param>

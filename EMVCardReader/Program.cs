@@ -237,14 +237,14 @@ namespace EMVCardReader
                     }
                 }
 
-                // Pending: WARM RESET
+                WarmReset(isoReader);
 
                 // Process Application for each AIDs
                 foreach (byte[] AID in CardData.AvailableAIDs)
                 {
                     ProcessApplication(isoReader, AID);
 
-                    // Pending: WARM RESET
+                    WarmReset(isoReader);
                 }
 
                 GetCPLCData(isoReader);
@@ -265,6 +265,16 @@ namespace EMVCardReader
         }
 
         /// <summary>
+        /// Warm Resets the card.
+        /// </summary>
+        /// <param name="isoReader">The instance of the currently used ISO/IEC 7816 compliant reader.</param>
+        private static void WarmReset(IsoReader isoReader)
+        {
+            isoReader.Disconnect(SCardReaderDisposition.Reset);
+            isoReader.Connect(SelectedReader, SCardShareMode.Shared, SCardProtocol.Any);
+        }
+
+        /// <summary>
         /// Processes the PSE and generates the supported application list.
         /// </summary>
         /// <param name="isoReader">The instance of the currently used ISO/IEC 7816 compliant reader.</param>
@@ -277,7 +287,7 @@ namespace EMVCardReader
             // Might be a french card
             if (response.SW1 == 0x6E && response.SW2 == 0x00)
             {
-                // Pending: WARM RESET
+                WarmReset(isoReader);
                 response = SelectFileCommand(isoReader, DataProcessor.AsciiStringToByteArray("1PAY.SYS.DDF01"));
             }
 
@@ -506,16 +516,16 @@ namespace EMVCardReader
             // Get Records from AFL
             foreach (byte[] afl in AFLList)
             {
+                int SFI = DataProcessor.ExtractSFI(afl[0]);
                 int RecordNumber = afl[1];
-
-                // Pending: Check record number
+                
                 do
                 {
-                    response = ReadRecordCommand(isoReader, RecordNumber, RecordNumber);
+                    response = ReadRecordCommand(isoReader, RecordNumber, DataProcessor.SFItoP2(SFI));
 
                     if (response.SW1 == 0x6C)
                     {
-                        response = ReadRecordCommand(isoReader, RecordNumber, RecordNumber, response.SW2);
+                        response = ReadRecordCommand(isoReader, RecordNumber, DataProcessor.SFItoP2(SFI), response.SW2);
                     }
 
                     if (response.SW1 == 0x90 && response.SW2 == 0x00)
