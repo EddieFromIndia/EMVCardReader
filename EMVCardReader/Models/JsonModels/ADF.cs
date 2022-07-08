@@ -5,7 +5,7 @@ namespace EMVCardReader.Models
     public class ADF
     {
         [JsonProperty("Track 2 Equivalent Data", NullValueHandling = NullValueHandling.Ignore)]
-        public string Track2E { get; set; }
+        public Track2E Track2E { get; set; }
 
         [JsonProperty("Cardholder Name", NullValueHandling = NullValueHandling.Ignore)]
         public string CardholderName { get; set; }

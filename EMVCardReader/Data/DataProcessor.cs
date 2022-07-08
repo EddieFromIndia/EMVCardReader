@@ -24,7 +24,7 @@ namespace EMVCardReader
         /// <returns>The SFI as a byte</returns>
         public static byte ExtractSFI(byte sfi)
         {
-            return (byte)Convert.ToInt32(Convert.ToString(sfi, 2).Substring(0, 5), 2);
+            return (byte)Convert.ToInt32(Convert.ToString(sfi, 2).PadLeft(8, '0').Substring(0, 5), 2);
         }
 
         /// <summary>

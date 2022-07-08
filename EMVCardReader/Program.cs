@@ -16,7 +16,7 @@ namespace EMVCardReader
         /// <summary>
         /// Default PDOL to be used when no PDOL is received from the card.
         /// </summary>
-        private static readonly byte[] defaultPDOL = new byte[] { 0x83, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+        private static readonly byte[] defaultPDOL = new byte[] { 0x83, 0x00 };
 
         /// <summary>
         /// The selected card reader name.
@@ -516,6 +516,7 @@ namespace EMVCardReader
             }
 
             AFLList = DataProcessor.SplitArray(AFL, 4);
+            AFLList.RemoveAt(AFLList.Count - 1);
 
             // Get Records from AFL
             foreach (byte[] afl in AFLList)
@@ -525,11 +526,11 @@ namespace EMVCardReader
                 
                 do
                 {
-                    response = ReadRecordCommand(isoReader, RecordNumber, DataProcessor.SFItoP2(SFI));
+                    response = ReadRecordCommand(isoReader, RecordNumber, SFI);
 
                     if (response.SW1 == 0x6C)
                     {
-                        response = ReadRecordCommand(isoReader, RecordNumber, DataProcessor.SFItoP2(SFI), response.SW2);
+                        response = ReadRecordCommand(isoReader, RecordNumber, SFI, response.SW2);
                     }
 
                     if (response.SW1 == 0x90 && response.SW2 == 0x00)
@@ -718,7 +719,20 @@ namespace EMVCardReader
                             switch (tag.Tag.Hex)
                             {
                                 case "57":
-                                    adf.Track2E = DataProcessor.ByteArrayToHexString(tag.Value.Bytes, true);
+                                    Track2E track2E = new Track2E();
+                                    int separatorIndex = tag.Value.Hex.IndexOf('D');
+
+                                    track2E.PAN = tag.Value.Hex.Substring(0, separatorIndex);
+                                    track2E.MajorIndustryIdentifier = track2E.PAN.Substring(0, 1);
+                                    track2E.IssuerIdentifierNumber = track2E.PAN.Substring(0, 6);
+                                    track2E.AccountNumber = track2E.PAN.Substring(6, track2E.PAN.Length - 7);
+                                    track2E.CheckDigit = track2E.PAN.Substring(track2E.PAN.Length - 1);
+
+                                    track2E.ExpirationData = tag.Value.Hex.Substring(separatorIndex + 1, 4);
+                                    track2E.ServiceCode = tag.Value.Hex.Substring(separatorIndex + 5, 3);
+                                    track2E.DiscretionaryData = tag.Value.Hex.Substring(separatorIndex + 8);
+
+                                    adf.Track2E = track2E;
                                     break;
                                 case "5F20":
                                     adf.CardholderName = DataProcessor.ByteArrayToAsciiString(tag.Value.Bytes);
