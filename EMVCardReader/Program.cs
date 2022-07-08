@@ -334,7 +334,7 @@ namespace EMVCardReader
                     if (response.SW1 == 0x90 && response.SW2 == 0x00)
                     {
                         byte[] FCI = response.GetData();
-                        CardData.AvailableAIDs.Add(DataProcessor.GetDataObject(FCI, new byte[] { 0x4f }));
+                        CardData.AvailableAIDs.Add(DataProcessor.GetDataObject(FCI, new byte[] { 0x4F }));
                         CardData.AvailableADFs.Add(new ADFModel()
                         {
                             AID = CardData.AvailableAIDs[CardData.AvailableAIDs.Count - 1],
@@ -692,7 +692,7 @@ namespace EMVCardReader
                                                 fci.IssuerCountryCode3 = DataProcessor.ByteArrayToAsciiString(subtag.Value.Bytes);
                                                 break;
                                             case "87":
-                                                fci.ApplicationPriorityIndicator = DataProcessor.ByteArrayToAsciiString(subtag.Value.Bytes);
+                                                fci.ApplicationPriorityIndicator = DataProcessor.ByteArrayToHexString(subtag.Value.Bytes);
                                                 break;
                                             case "42":
                                                 fci.IssuerIdentificationNumber = DataProcessor.ByteArrayToHexString(subtag.Value.Bytes, true);
@@ -701,7 +701,7 @@ namespace EMVCardReader
                                                 fci.ApplicationLabel = DataProcessor.ByteArrayToAsciiString(subtag.Value.Bytes);
                                                 break;
                                             case "88":
-                                                fci.SFI = DataProcessor.ByteArrayToAsciiString(subtag.Value.Bytes);
+                                                fci.SFI = DataProcessor.ByteArrayToHexString(subtag.Value.Bytes);
                                                 break;
                                             case "5F2D":
                                                 fci.LanguagePreference = DataProcessor.ByteArrayToAsciiString(subtag.Value.Bytes);
@@ -755,6 +755,9 @@ namespace EMVCardReader
                                 case "5F24":
                                     adf.ApplicationExpirationDate = DataProcessor.ByteArrayToHexString(tag.Value.Bytes, true);
                                     break;
+                                case "5F25":
+                                    adf.ApplicationEffectiveDate = DataProcessor.ByteArrayToHexString(tag.Value.Bytes, true);
+                                    break;
                                 case "8C":
                                     CDOL cdol1 = new CDOL();
                                     foreach (EmvTlv subtag in tag.Children)
@@ -762,31 +765,43 @@ namespace EMVCardReader
                                         switch (subtag.Tag.Hex)
                                         {
                                             case "9A":
-                                                cdol1.TransactionDate = DataProcessor.ByteArrayToHexString(subtag.Value.Bytes, true);
+                                                cdol1.TransactionDate = subtag.Length.ToString();
                                                 break;
                                             case "9F37":
-                                                cdol1.UnpredictableNumber = DataProcessor.ByteArrayToHexString(subtag.Value.Bytes, true);
+                                                cdol1.UnpredictableNumber = subtag.Length.ToString();
                                                 break;
                                             case "9F1A":
-                                                cdol1.TerminalCountryCode = DataProcessor.ByteArrayToHexString(subtag.Value.Bytes, true);
+                                                cdol1.TerminalCountryCode = subtag.Length.ToString();
                                                 break;
                                             case "5F2A":
-                                                cdol1.TransactionCountryCode = DataProcessor.ByteArrayToHexString(subtag.Value.Bytes, true);
+                                                cdol1.TransactionCountryCode = subtag.Length.ToString();
                                                 break;
                                             case "9C":
-                                                cdol1.TransactionType = DataProcessor.ByteArrayToHexString(subtag.Value.Bytes, true);
+                                                cdol1.TransactionType = subtag.Length.ToString();
                                                 break;
                                             case "9F02":
-                                                cdol1.AmountAuthorised = DataProcessor.ByteArrayToHexString(subtag.Value.Bytes, true);
+                                                cdol1.AmountAuthorised = subtag.Length.ToString();
                                                 break;
                                             case "9F03":
-                                                cdol1.AmountOther = DataProcessor.ByteArrayToHexString(subtag.Value.Bytes, true);
+                                                cdol1.AmountOther = subtag.Length.ToString();
                                                 break;
                                             case "95":
-                                                cdol1.TerminalVerificationResults = DataProcessor.ByteArrayToHexString(subtag.Value.Bytes, true);
+                                                cdol1.TerminalVerificationResults = subtag.Length.ToString();
                                                 break;
                                             case "8A":
-                                                cdol1.AuthorizationResponseCode = DataProcessor.ByteArrayToHexString(subtag.Value.Bytes, true);
+                                                cdol1.AuthorizationResponseCode = subtag.Length.ToString();
+                                                break;
+                                            case "9F35":
+                                                cdol1.TerminalType = subtag.Length.ToString();
+                                                break;
+                                            case "9F45":
+                                                cdol1.DataAuthenticationCode = subtag.Length.ToString();
+                                                break;
+                                            case "9F4C":
+                                                cdol1.IccDynamicNumber = subtag.Length.ToString();
+                                                break;
+                                            case "91":
+                                                cdol1.IssuerAuthenticationData = subtag.Length.ToString();
                                                 break;
                                         }
                                     }
@@ -799,48 +814,60 @@ namespace EMVCardReader
                                         switch (subtag.Tag.Hex)
                                         {
                                             case "9A":
-                                                cdol2.TransactionDate = DataProcessor.ByteArrayToHexString(subtag.Value.Bytes, true);
+                                                cdol2.TransactionDate = subtag.Length.ToString();
                                                 break;
                                             case "9F37":
-                                                cdol2.UnpredictableNumber = DataProcessor.ByteArrayToHexString(subtag.Value.Bytes, true);
+                                                cdol2.UnpredictableNumber = subtag.Length.ToString();
                                                 break;
                                             case "9F1A":
-                                                cdol2.TerminalCountryCode = DataProcessor.ByteArrayToHexString(subtag.Value.Bytes, true);
+                                                cdol2.TerminalCountryCode = subtag.Length.ToString();
                                                 break;
                                             case "5F2A":
-                                                cdol2.TransactionCountryCode = DataProcessor.ByteArrayToHexString(subtag.Value.Bytes, true);
+                                                cdol2.TransactionCountryCode = subtag.Length.ToString();
                                                 break;
                                             case "9C":
-                                                cdol2.TransactionType = DataProcessor.ByteArrayToHexString(subtag.Value.Bytes, true);
+                                                cdol2.TransactionType = subtag.Length.ToString();
                                                 break;
                                             case "9F02":
-                                                cdol2.AmountAuthorised = DataProcessor.ByteArrayToHexString(subtag.Value.Bytes, true);
+                                                cdol2.AmountAuthorised = subtag.Length.ToString();
                                                 break;
                                             case "9F03":
-                                                cdol2.AmountOther = DataProcessor.ByteArrayToHexString(subtag.Value.Bytes, true);
+                                                cdol2.AmountOther = subtag.Length.ToString();
                                                 break;
                                             case "95":
-                                                cdol2.TerminalVerificationResults = DataProcessor.ByteArrayToHexString(subtag.Value.Bytes, true);
+                                                cdol2.TerminalVerificationResults = subtag.Length.ToString();
                                                 break;
                                             case "8A":
-                                                cdol2.AuthorizationResponseCode = DataProcessor.ByteArrayToHexString(subtag.Value.Bytes, true);
+                                                cdol2.AuthorizationResponseCode = subtag.Length.ToString();
+                                                break;
+                                            case "9F35":
+                                                cdol2.TerminalType = subtag.Length.ToString();
+                                                break;
+                                            case "9F45":
+                                                cdol2.DataAuthenticationCode = subtag.Length.ToString();
+                                                break;
+                                            case "9F4C":
+                                                cdol2.IccDynamicNumber = subtag.Length.ToString();
+                                                break;
+                                            case "91":
+                                                cdol2.IssuerAuthenticationData = subtag.Length.ToString();
                                                 break;
                                         }
                                     }
                                     adf.CDOL2 = cdol2;
                                     break;
                                 case "5A":
-                                    adf.ApplicationPAN = DataProcessor.ByteArrayToHexString(tag.Value.Bytes);
+                                    adf.ApplicationPAN = tag.Value.Hex;
                                     break;
                                 case "5F34":
-                                    adf.ApplicationPANSN = DataProcessor.ByteArrayToHexString(tag.Value.Bytes);
+                                    adf.ApplicationPANSN = tag.Value.Hex;
                                     break;
                                 case "9F08":
                                 case "9F09":
                                     adf.ApplicationVersionNumber = DataProcessor.ByteArrayToHexString(tag.Value.Bytes, true);
                                     break;
                                 case "5F28":
-                                    adf.IssuerCountryCode = DataProcessor.ByteArrayToHexString(tag.Value.Bytes);
+                                    adf.IssuerCountryCode = DataProcessor.ByteArrayToIntString(tag.Value.Bytes);
                                     break;
                                 case "8E":
                                     adf.CVMList = DataProcessor.ByteArrayToHexString(tag.Value.Bytes, true);
@@ -854,7 +881,7 @@ namespace EMVCardReader
                     case "9F36":
                         return new AdditionalData
                         {
-                            ApplicationTransactionCounter = DataProcessor.ByteArrayToHexString(tlvItem.Value.Bytes)
+                            ApplicationTransactionCounter = DataProcessor.ByteArrayToIntString(tlvItem.Value.Bytes)
                         };
                     case "9F13":
                         return new AdditionalData

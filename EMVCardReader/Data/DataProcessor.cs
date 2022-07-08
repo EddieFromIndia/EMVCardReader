@@ -189,8 +189,24 @@ namespace EMVCardReader
         /// <returns>Integer equivalent of the hex character</returns>
         public static int GetHexVal(char hex)
         {
-            int val = (int)hex;
+            int val = hex;
             return val - (val < 58 ? 48 : (val < 97 ? 55 : 87));
+        }
+
+        /// <summary>
+        /// Converts a byte array to an equivalent integer.
+        /// For example: 0x00, 0x0B returns 11.
+        /// </summary>
+        /// <param name="ba"></param>
+        /// <returns>Integer equivalent of the byte array as a string</returns>
+        public static string ByteArrayToIntString(byte[] ba)
+        {
+            if (BitConverter.IsLittleEndian)
+            {
+                Array.Reverse(ba);
+            }
+
+            return BitConverter.ToInt32(ba, 0).ToString();
         }
     }
 }

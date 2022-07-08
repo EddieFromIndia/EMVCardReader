@@ -28,6 +28,9 @@ namespace EMVCardReader.Models
         [JsonProperty("Application Expiration Date", NullValueHandling = NullValueHandling.Ignore)]
         public string ApplicationExpirationDate { get; set; }
 
+        [JsonProperty("Application Effective Date", NullValueHandling = NullValueHandling.Ignore)]
+        public string ApplicationEffectiveDate { get; set; }
+
         [JsonProperty("Card Risk Management Data Object List 1 (CDOL1)", NullValueHandling = NullValueHandling.Ignore)]
         public CDOL CDOL1 { get; set; }
 

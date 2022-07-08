@@ -30,5 +30,17 @@ namespace EMVCardReader.Models
 
         [JsonProperty("Authorization Response Code", NullValueHandling = NullValueHandling.Ignore)]
         public string AuthorizationResponseCode { get; set; }
+
+        [JsonProperty("Terminal Type", NullValueHandling = NullValueHandling.Ignore)]
+        public string TerminalType { get; set; }
+
+        [JsonProperty("Data Authentication Code", NullValueHandling = NullValueHandling.Ignore)]
+        public string DataAuthenticationCode { get; set; }
+
+        [JsonProperty("ICC Dynamic Number", NullValueHandling = NullValueHandling.Ignore)]
+        public string IccDynamicNumber { get; set; }
+
+        [JsonProperty("Issuer Authentication Data", NullValueHandling = NullValueHandling.Ignore)]
+        public string IssuerAuthenticationData { get; set; }
     }
 }
