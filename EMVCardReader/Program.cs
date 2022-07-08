@@ -7,6 +7,7 @@ using PCSC.Iso7816;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.Remoting.Contexts;
 using System.Text.RegularExpressions;
 
 namespace EMVCardReader
@@ -95,37 +96,28 @@ namespace EMVCardReader
                                 break;
                             case "2":
                                 // Check card type
-
-                                bool atrFound = false;
-                                using (IsoReader isoReader = new IsoReader(context, SelectedReader, SCardShareMode.Shared, SCardProtocol.Any, false))
+                                Console.WriteLine();
+                                if (string.IsNullOrEmpty(SelectedReader))
                                 {
-                                    CardData.ColdATR = GetColdAtr(context);
-                                    foreach (List<string> item in ATRList.List)
+                                    Console.WriteLine("No card readers selected. Select a reader first.");
+                                }
+                                else
+                                {
+                                    Console.Write("Determining card type. Please wait...");
+                                    string cardType = GetCardType(context);
+
+                                    if (cardType == null)
                                     {
-                                        Regex regex = new Regex(item[0]);
-                                        MatchCollection matches = regex.Matches(DataProcessor.ByteArrayToHexString(CardData.ColdATR, true).Replace(",", string.Empty));
-
-                                        if (matches.Count > 0)
-                                        {
-                                            atrFound = true;
-
-                                            Console.WriteLine();
-                                            Console.WriteLine("Possible Card Type/s:");
-                                            Console.WriteLine();
-                                            Console.WriteLine(item[1]);
-                                            Console.WriteLine();
-
-                                            break;
-                                        }
+                                        Console.WriteLine();
+                                        Console.WriteLine("Card type cannot be determined.");
+                                    }
+                                    else
+                                    {
+                                        Console.WriteLine();
+                                        Console.WriteLine(cardType);
                                     }
                                 }
-
-                                if (!atrFound)
-                                {
-                                    Console.WriteLine();
-                                    Console.WriteLine("Card type cannot be determined.");
-                                    Console.WriteLine();
-                                }
+                                Console.WriteLine();
                                 break;
                             case "3":
                                 // Get card details and display
@@ -202,6 +194,211 @@ namespace EMVCardReader
 
             Console.WriteLine("An invalid number has been entered.");
             return null;
+        }
+
+        /// <summary>
+        /// Gets the card type.
+        /// </summary>
+        /// <param name="context">The card context</param>
+        /// <returns>Card type as string</returns>
+        private static string GetCardType(ISCardContext context)
+        {
+            using (IsoReader isoReader = new IsoReader(context, SelectedReader, SCardShareMode.Shared, SCardProtocol.Any, false))
+            {
+                List<byte[]> aidList = GetAidsFromPSE(isoReader);
+
+                if (aidList.Count == 0)
+                {
+                    // Generate AID list manually
+                    aidList = GenerateCandidateList(isoReader);
+                }
+
+                WarmReset(isoReader);
+
+                // Process Application for each AIDs
+                foreach (byte[] AID in aidList)
+                {
+                    string label = GetApplicationLabel(isoReader, AID);
+
+                    if (label != null)
+                    {
+                        return label;
+                    }
+
+                    WarmReset(isoReader);
+                }
+
+                isoReader.Disconnect(SCardReaderDisposition.Reset);
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Generate AID list for PSE.
+        /// </summary>
+        /// <param name="isoReader"></param>
+        /// <returns>List of AIDs or empty list</returns>
+        private static List<byte[]> GetAidsFromPSE(IsoReader isoReader)
+        {
+            List<byte[]> AvailableAIDs = new List<byte[]>();
+            // Select PSE
+            Response response = SelectFileCommand(isoReader, DataProcessor.AsciiStringToByteArray("1PAY.SYS.DDF01"));
+
+            // Might be a french card
+            if (response.SW1 == 0x6E && response.SW2 == 0x00)
+            {
+                WarmReset(isoReader);
+                response = SelectFileCommand(isoReader, DataProcessor.AsciiStringToByteArray("1PAY.SYS.DDF01"));
+            }
+
+            // Might be a contactless card
+            if (response.SW1 == 0x6A && response.SW2 == 0x82)
+            {
+                return GetAidsFromPPSE(isoReader);
+            }
+
+            if (response.SW1 == 0x61)
+            {
+                response = GetResponseCommand(isoReader, response.SW2);
+            }
+
+            if (!(response.SW1 == 0x90 && response.SW2 == 0x00))
+            {
+                return new List<byte[]>();
+            }
+
+            byte[] FCIofDDF = response.GetData();
+
+            // Extract SFI
+            EmvTlvList FCIofDDFTags = EmvTlvList.Parse(FCIofDDF);
+            if (FCIofDDFTags[0].Children[1].Children[0].Tag.Hex == "88")
+            {
+                int sfi = FCIofDDFTags[0].Children[1].Children[0].Value.Bytes[0];
+                int record = 1;
+                int triesLeft = 5;
+
+                do
+                {
+                    response = ReadRecordCommand(isoReader, record++, sfi);
+
+                    if (response.SW1 == 0x6C && response.SW2 != 0x00)
+                    {
+                        response = ReadRecordCommand(isoReader, record, sfi, response.SW2);
+                    }
+
+                    // Generate list of AIDs
+                    if (response.SW1 == 0x90 && response.SW2 == 0x00)
+                    {
+                        byte[] FCI = response.GetData();
+                        AvailableAIDs.Add(DataProcessor.GetDataObject(FCI, new byte[] { 0x4F }));
+                        continue;
+                    }
+
+                    // Some cards have records starting from 4 or 5,
+                    // so, don't quit until 5 records are checked.
+                    if (record > 5)
+                    {
+                        triesLeft--;
+                    }
+                    record++;
+                } while (triesLeft > 0);
+            }
+
+            return AvailableAIDs;
+        }
+
+        /// <summary>
+        /// Generate AID list for PPSE.
+        /// </summary>
+        /// <param name="isoReader"></param>
+        /// <returns>List of AIDs or empty list</returns>
+        private static List<byte[]> GetAidsFromPPSE(IsoReader isoReader)
+        {
+            List<byte[]> AvailableAIDs = new List<byte[]>();
+            // Select PPSE
+            Response response = SelectFileCommand(isoReader, DataProcessor.AsciiStringToByteArray("2PAY.SYS.DDF01"));
+
+            if (response.SW1 == 0x61)
+            {
+                response = GetResponseCommand(isoReader, response.SW2);
+            }
+
+            if (!(response.SW1 == 0x90 && response.SW2 == 0x00))
+            {
+                return new List<byte[]>();
+            }
+
+            byte[] FCIofDDF = response.GetData();
+
+            // Extract SFI
+            EmvTlvList FCIofDDFTags = EmvTlvList.Parse(FCIofDDF);
+            if (FCIofDDFTags[0].Children[1].Children[0].Tag.Hex == "88")
+            {
+                int sfi = FCIofDDFTags[0].Children[1].Children[0].Value.Bytes[0];
+                int record = 1;
+                int triesLeft = 5;
+
+                do
+                {
+                    response = ReadRecordCommand(isoReader, record++, sfi);
+
+                    if (response.SW1 == 0x6C && response.SW2 != 0x00)
+                    {
+                        response = ReadRecordCommand(isoReader, record, sfi, response.SW2);
+                    }
+
+                    // Generate list of AIDs
+                    if (response.SW1 == 0x90 && response.SW2 == 0x00)
+                    {
+                        byte[] FCI = response.GetData();
+                        AvailableAIDs.Add(DataProcessor.GetDataObject(FCI, new byte[] { 0x4F }));
+                        continue;
+                    }
+
+                    // Some cards have records starting from 4 or 5,
+                    // so, don't quit until 5 records are checked.
+                    if (record > 5)
+                    {
+                        triesLeft--;
+                    }
+                    record++;
+                } while (triesLeft > 0);
+            }
+
+            return AvailableAIDs;
+        }
+
+        /// <summary>
+        /// Processes an application and generates the application-related tlv data.
+        /// </summary>
+        /// <param name="isoReader">The instance of the currently used ISO/IEC 7816 compliant reader</param>
+        /// <param name="AID">The Application ID to be processed</param>
+        private static string GetApplicationLabel(IsoReader isoReader, byte[] AID)
+        {
+            // Select Application
+            Response response = SelectFileCommand(isoReader, AID);
+
+            if (response.SW1 == 0x61)
+            {
+                response = GetResponseCommand(isoReader, response.SW2);
+            }
+
+            if (!(response.SW1 == 0x90 && response.SW2 == 0x00))
+            {
+                return null;
+            }
+
+            byte[] ADF = response.GetData();
+
+            EmvTlv tag = (EmvTlvList.Parse(ADF)).FindFirst("50");
+
+            if (tag == null)
+            {
+                return null;
+            }
+
+            return tag.Value.Ascii;
         }
 
         /// <summary>
