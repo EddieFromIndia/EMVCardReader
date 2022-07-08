@@ -760,7 +760,7 @@ namespace EMVCardReader
                 {
                     response = GetResponseCommand(isoReader, response.SW2);
 
-                    if (response.SW1 == 0x90 || response.SW2 == 0x00)
+                    if (response.SW1 == 0x90 && response.SW2 == 0x00)
                     {
                         candidateList.Add(DataProcessor.HexStringToByteArray(aid));
                     }
@@ -840,6 +840,8 @@ namespace EMVCardReader
             }
 
             jsonData.CPLC = DataProcessor.ByteArrayToHexString(CardData.CPLC, true);
+
+            ClearCardData();
 
             return JsonConvert.SerializeObject(jsonData);
         }
@@ -1173,6 +1175,19 @@ namespace EMVCardReader
             Console.WriteLine("SCANNED EMV DATA AS JSON:");
             Console.WriteLine();
             Console.WriteLine(jsonData);
+        }
+
+        /// <summary>
+        /// Clears all the fields in CardData class.
+        /// </summary>
+        private static void ClearCardData()
+        {
+            CardData.ColdATR = null;
+            CardData.AvailableAIDs = new List<byte[]>();
+            CardData.AvailableADFs = new List<ADFModel>();
+            CardData.FCIofDDF = null;
+            CardData.FCIofDDFContactless = null;
+            CardData.CPLC = null;
         }
 
 
