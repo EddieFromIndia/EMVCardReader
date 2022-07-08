@@ -60,6 +60,7 @@ namespace EMVCardReader
                                 else
                                 {
                                     SelectedReader = ChooseReader(readerNames);
+
                                     Console.WriteLine();
                                     Console.WriteLine("The card reader has been selected.");
                                     Console.WriteLine();
@@ -75,29 +76,32 @@ namespace EMVCardReader
                                 }
                                 else
                                 {
-                                    SCardReaderState readerState = context.GetReaderStatus(SelectedReader);
-                                    Console.WriteLine();
-                                    switch (readerState.CurrentState)
+                                    using (IsoReader isoReader = new IsoReader(context, SelectedReader, SCardShareMode.Shared, SCardProtocol.Any, false))
                                     {
-                                        case SCRState.Unaware:
-                                        case SCRState.Changed:
-                                        case SCRState.Unknown:
-                                        case SCRState.Ignore:
-                                        case SCRState.Unavailable:
-                                        case SCRState.Empty:
-                                        case SCRState.Exclusive:
-                                        case SCRState.Mute:
-                                        case SCRState.Unpowered:
-                                            Console.WriteLine("false");
-                                            break;
-                                        case SCRState.Present:
-                                        case SCRState.AtrMatch:
-                                        case SCRState.InUse:
-                                            Console.WriteLine("true");
-                                            break;
-                                    }
+                                        SCardReaderState readerState = context.GetReaderStatus(SelectedReader);
+                                        Console.WriteLine();
+                                        switch (readerState.CurrentState)
+                                        {
+                                            case SCRState.Unaware:
+                                            case SCRState.Changed:
+                                            case SCRState.Unknown:
+                                            case SCRState.Ignore:
+                                            case SCRState.Unavailable:
+                                            case SCRState.Empty:
+                                            case SCRState.Exclusive:
+                                            case SCRState.Mute:
+                                            case SCRState.Unpowered:
+                                                Console.WriteLine("false");
+                                                break;
+                                            case SCRState.Present:
+                                            case SCRState.AtrMatch:
+                                            case SCRState.InUse:
+                                                Console.WriteLine("true");
+                                                break;
+                                        }
 
-                                    Console.WriteLine();
+                                        Console.WriteLine();
+                                    }
                                 }
                                 break;
                             case "2":
@@ -437,11 +441,11 @@ namespace EMVCardReader
 
             CardData.AvailableADFs.FirstOrDefault(adf => adf.AID == AID).ADF = response.GetData();
 
-            byte[] PDOL = DataProcessor.GetDataObject(response.GetData(), new byte[] { 0x9f, 0x38 });
+            byte[] PDOL = DataProcessor.GetDataObject(response.GetData(), new byte[] { 0x9F, 0x38 });
             CardData.AvailableADFs.FirstOrDefault(adf => adf.AID == AID).PDOL = PDOL;
 
             PDOL = BuildPdolDataBlock(PDOL);
-
+            
             response = GetProcessingOptionsCommand(isoReader, PDOL);
 
             if (!(response.SW1 == 0x90 && response.SW2 == 00))
@@ -464,35 +468,35 @@ namespace EMVCardReader
             CardData.AvailableADFs.FirstOrDefault(adf => adf.AID == AID).ProcessingOptions = gpoData;
 
             // Get ATC
-            response = GetDataCommand(isoReader, new byte[] { 0x9f, 0x36 });
+            response = GetDataCommand(isoReader, new byte[] { 0x9F, 0x36 });
             if (response.SW1 == 0x90 && response.SW2 == 00)
             {
                 CardData.AvailableADFs.FirstOrDefault(adf => adf.AID == AID).ATC = response.GetData();
             }
 
             // Get LastOnlineATCRegister
-            response = GetDataCommand(isoReader, new byte[] { 0x9f, 0x13 });
+            response = GetDataCommand(isoReader, new byte[] { 0x9F, 0x13 });
             if (response.SW1 == 0x90 && response.SW2 == 00)
             {
                 CardData.AvailableADFs.FirstOrDefault(adf => adf.AID == AID).LastOnlineATCRegister = response.GetData();
             }
 
             // Get PIN Try Counter
-            response = GetDataCommand(isoReader, new byte[] { 0x9f, 0x17 });
+            response = GetDataCommand(isoReader, new byte[] { 0x9F, 0x17 });
             if (response.SW1 == 0x90 && response.SW2 == 00)
             {
                 CardData.AvailableADFs.FirstOrDefault(adf => adf.AID == AID).PinTryCounter = response.GetData();
             }
 
             // Get Log Entry
-            response = GetDataCommand(isoReader, new byte[] { 0x9f, 0x4D });
+            response = GetDataCommand(isoReader, new byte[] { 0x9F, 0x4D });
             if (response.SW1 == 0x90 && response.SW2 == 00)
             {
                 CardData.AvailableADFs.FirstOrDefault(adf => adf.AID == AID).LogEntry = response.GetData();
             }
 
             // Get Log Format
-            response = GetDataCommand(isoReader, new byte[] { 0x9f, 0x4F });
+            response = GetDataCommand(isoReader, new byte[] { 0x9F, 0x4F });
             if (response.SW1 == 0x90 && response.SW2 == 00)
             {
                 CardData.AvailableADFs.FirstOrDefault(adf => adf.AID == AID).LogFormat = response.GetData();
@@ -545,7 +549,7 @@ namespace EMVCardReader
         /// <param name="isoReader">The instance of the currently used ISO/IEC 7816 compliant reader</param>
         private static void GetCPLCData(IsoReader isoReader)
         {
-            Response response = GetDataCommand(isoReader, new byte[] { 0x9f, 0x7F });
+            Response response = GetDataCommand(isoReader, new byte[] { 0x9F, 0x7F });
             if (response.SW1 == 0x90 && response.SW2 == 00)
             {
                 CardData.CPLC = response.GetData();
@@ -585,7 +589,10 @@ namespace EMVCardReader
         /// <returns>The serialized data as JSON string</returns>
         private static string SerializeDataToJson()
         {
-            jsonData.ColdATR = DataProcessor.ByteArrayToHexString(CardData.ColdATR, true);
+            if (CardData.ColdATR != null)
+            {
+                jsonData.ColdATR = DataProcessor.ByteArrayToHexString(CardData.ColdATR, true);
+            }
 
             List<string> aids = new List<string>();
             foreach (byte[] aid in CardData.AvailableAIDs)
@@ -594,23 +601,55 @@ namespace EMVCardReader
             }
             jsonData.AIDs = aids;
 
-            jsonData.TLV.Add(DecodeTLV(CardData.FCIofDDF));
-            jsonData.TLV.Add(DecodeTLV(CardData.FCIofDDFContactless));
+            if (CardData.FCIofDDF != null)
+            {
+                jsonData.TLV.Add(DecodeTLV(CardData.FCIofDDF));
+            }
+
+            if (CardData.FCIofDDFContactless != null)
+            {
+                jsonData.TLV.Add(DecodeTLV(CardData.FCIofDDFContactless));
+            }
 
             foreach (ADFModel adf in CardData.AvailableADFs)
             {
-                jsonData.TLV.Add(DecodeTLV(adf.ADF));
+                if (adf.ADF != null)
+                {
+                    jsonData.TLV.Add(DecodeTLV(adf.ADF));
+                }
 
                 foreach (RecordModel aef in adf.AEFs)
                 {
-                    jsonData.TLV.Add(DecodeTLV(aef.FCI));
+                    if (aef.FCI != null)
+                    {
+                        jsonData.TLV.Add(DecodeTLV(aef.FCI));
+                    }
                 }
 
-                jsonData.TLV.Add(DecodeTLV(adf.ATC));
-                jsonData.TLV.Add(DecodeTLV(adf.LastOnlineATCRegister));
-                jsonData.TLV.Add(DecodeTLV(adf.PinTryCounter));
-                jsonData.TLV.Add(DecodeTLV(adf.LogEntry));
-                jsonData.TLV.Add(DecodeTLV(adf.LogFormat));
+                if (adf.ATC != null)
+                {
+                    jsonData.TLV.Add(DecodeTLV(adf.ATC));
+                }
+
+                if (adf.LastOnlineATCRegister != null)
+                {
+                    jsonData.TLV.Add(DecodeTLV(adf.LastOnlineATCRegister));
+                }
+
+                if (adf.PinTryCounter != null)
+                {
+                    jsonData.TLV.Add(DecodeTLV(adf.PinTryCounter));
+                }
+
+                if (adf.LogEntry != null)
+                {
+                    jsonData.TLV.Add(DecodeTLV(adf.LogEntry));
+                }
+
+                if (adf.LogFormat != null)
+                {
+                    jsonData.TLV.Add(DecodeTLV(adf.LogFormat));
+                }
             }
 
             jsonData.CPLC = DataProcessor.ByteArrayToHexString(CardData.CPLC, true);
@@ -992,7 +1031,7 @@ namespace EMVCardReader
         /// <returns>APDU response of the command</returns>
         private static Response GetDataCommand(IsoReader isoReader, byte[] tag)
         {
-            CommandApdu command = new CommandApdu(IsoCase.Case4Short, isoReader.ActiveProtocol)
+            CommandApdu command = new CommandApdu(IsoCase.Case2Short, isoReader.ActiveProtocol)
             {
                 CLA = 0x80,
                 Instruction = InstructionCode.GetData,

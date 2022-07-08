@@ -59,17 +59,16 @@ namespace EMVCardReader
                     continue;
                 }
 
-                // found a match on first byte, now try to match rest of the pattern
-                for (int j = tag.Length - 1; j >= 1; j--)
+                if (tag.Length == 1)
+                {
+                    return i;
+                }
+
+                for (int j = 1; j < tag.Length; j++)
                 {
                     if (source[i + j] != tag[j])
                     {
                         break;
-                    }
-
-                    if (j == 1)
-                    {
-                        return i;
                     }
                 }
             }
@@ -145,7 +144,7 @@ namespace EMVCardReader
             StringBuilder hex = new StringBuilder(ba.Length * 2);
             foreach (byte b in ba)
             {
-                hex.AppendFormat("{0:x2}, ", b);
+                hex.AppendFormat(addCommaAndSpace ? "{0:x2}, " : "{0:x2}", b);
             }
 
             string formattedString = hex.ToString().ToUpper();
@@ -183,6 +182,7 @@ namespace EMVCardReader
 
         /// <summary>
         /// Returns the integer equivalent of a hex character.
+        /// For example, it returns 10 for A, 11 for B, etc.
         /// Helper function for HexStringToByteArray.
         /// </summary>
         /// <param name="hex"></param>

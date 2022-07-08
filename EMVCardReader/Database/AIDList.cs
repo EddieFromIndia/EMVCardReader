@@ -45,7 +45,8 @@ namespace EMVCardReader.Database
           "A00000006510",          // JCB
           "A0000000651010",        // JCB
           "A00000006900",          // FR Moneo
-          "A000000098",            // US Debit (Visa)
+          "A000000098",            // Bank of America Debit Card (Visa)
+          "A0000000980840",        // Visa Common Debit Card
           "A0000000980848",        // Schwab Bank Debit Card
           "A0000001211010",        // Dankort Danish domestic debit card
           "A0000001410001",        // Pagobancomat Italian domestic debit card
