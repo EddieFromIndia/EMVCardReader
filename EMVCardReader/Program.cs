@@ -78,28 +78,17 @@ namespace EMVCardReader
                                 {
                                     using (IsoReader isoReader = new IsoReader(context, SelectedReader, SCardShareMode.Shared, SCardProtocol.Any, false))
                                     {
-                                        SCardReaderState readerState = context.GetReaderStatus(SelectedReader);
                                         Console.WriteLine();
-                                        switch (readerState.CurrentState)
-                                        {
-                                            case SCRState.Unaware:
-                                            case SCRState.Changed:
-                                            case SCRState.Unknown:
-                                            case SCRState.Ignore:
-                                            case SCRState.Unavailable:
-                                            case SCRState.Empty:
-                                            case SCRState.Exclusive:
-                                            case SCRState.Mute:
-                                            case SCRState.Unpowered:
-                                                Console.WriteLine("false");
-                                                break;
-                                            case SCRState.Present:
-                                            case SCRState.AtrMatch:
-                                            case SCRState.InUse:
-                                                Console.WriteLine("true");
-                                                break;
-                                        }
 
+                                        if (GetColdAtr(context).Length > 0)
+                                        {
+                                            Console.WriteLine("true");
+                                        }
+                                        else
+                                        {
+                                            Console.WriteLine("false");
+                                        }
+                                        
                                         Console.WriteLine();
                                     }
                                 }
