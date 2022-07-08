@@ -749,100 +749,168 @@ namespace EMVCardReader
                                     break;
                                 case "8C":
                                     CDOL cdol1 = new CDOL();
-                                    foreach (EmvTlv subtag in tag.Children)
+
+                                    int tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9A });
+                                    if (tagIndex >= 0)
                                     {
-                                        switch (subtag.Tag.Hex)
-                                        {
-                                            case "9A":
-                                                cdol1.TransactionDate = subtag.Length.ToString();
-                                                break;
-                                            case "9F37":
-                                                cdol1.UnpredictableNumber = subtag.Length.ToString();
-                                                break;
-                                            case "9F1A":
-                                                cdol1.TerminalCountryCode = subtag.Length.ToString();
-                                                break;
-                                            case "5F2A":
-                                                cdol1.TransactionCountryCode = subtag.Length.ToString();
-                                                break;
-                                            case "9C":
-                                                cdol1.TransactionType = subtag.Length.ToString();
-                                                break;
-                                            case "9F02":
-                                                cdol1.AmountAuthorised = subtag.Length.ToString();
-                                                break;
-                                            case "9F03":
-                                                cdol1.AmountOther = subtag.Length.ToString();
-                                                break;
-                                            case "95":
-                                                cdol1.TerminalVerificationResults = subtag.Length.ToString();
-                                                break;
-                                            case "8A":
-                                                cdol1.AuthorizationResponseCode = subtag.Length.ToString();
-                                                break;
-                                            case "9F35":
-                                                cdol1.TerminalType = subtag.Length.ToString();
-                                                break;
-                                            case "9F45":
-                                                cdol1.DataAuthenticationCode = subtag.Length.ToString();
-                                                break;
-                                            case "9F4C":
-                                                cdol1.IccDynamicNumber = subtag.Length.ToString();
-                                                break;
-                                            case "91":
-                                                cdol1.IssuerAuthenticationData = subtag.Length.ToString();
-                                                break;
-                                        }
+                                        cdol1.TransactionDate = tag.Value.Bytes[tagIndex + 1].ToString();
                                     }
+
+                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9F, 0x37 });
+                                    if (tagIndex >= 0)
+                                    {
+                                        cdol1.UnpredictableNumber = tag.Value.Bytes[tagIndex + 2].ToString();
+                                    }
+
+                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9F, 0x1A });
+                                    if (tagIndex >= 0)
+                                    {
+                                        cdol1.TerminalCountryCode = tag.Value.Bytes[tagIndex + 2].ToString();
+                                    }
+
+                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x5F, 0x2A });
+                                    if (tagIndex >= 0)
+                                    {
+                                        cdol1.TransactionCountryCode = tag.Value.Bytes[tagIndex + 2].ToString();
+                                    }
+
+                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9C });
+                                    if (tagIndex >= 0)
+                                    {
+                                        cdol1.TransactionType = tag.Value.Bytes[tagIndex + 1].ToString();
+                                    }
+
+                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9F, 0x02 });
+                                    if (tagIndex >= 0)
+                                    {
+                                        cdol1.AmountAuthorised = tag.Value.Bytes[tagIndex + 2].ToString();
+                                    }
+
+                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9F, 0x03 });
+                                    if (tagIndex >= 0)
+                                    {
+                                        cdol1.AmountOther = tag.Value.Bytes[tagIndex + 2].ToString();
+                                    }
+
+                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x95 });
+                                    if (tagIndex >= 0)
+                                    {
+                                        cdol1.TerminalVerificationResults = tag.Value.Bytes[tagIndex + 1].ToString();
+                                    }
+
+                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x8A });
+                                    if (tagIndex >= 0)
+                                    {
+                                        cdol1.AuthorizationResponseCode = tag.Value.Bytes[tagIndex + 1].ToString();
+                                    }
+
+                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9F, 0x35 });
+                                    if (tagIndex >= 0)
+                                    {
+                                        cdol1.TerminalType = tag.Value.Bytes[tagIndex + 2].ToString();
+                                    }
+
+                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9F, 0x45 });
+                                    if (tagIndex >= 0)
+                                    {
+                                        cdol1.DataAuthenticationCode = tag.Value.Bytes[tagIndex + 2].ToString();
+                                    }
+
+                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9F, 0x4C });
+                                    if (tagIndex >= 0)
+                                    {
+                                        cdol1.IccDynamicNumber = tag.Value.Bytes[tagIndex + 2].ToString();
+                                    }
+
+                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x91 });
+                                    if (tagIndex >= 0)
+                                    {
+                                        cdol1.IssuerAuthenticationData = tag.Value.Bytes[tagIndex + 1].ToString();
+                                    }
+
                                     adf.CDOL1 = cdol1;
                                     break;
                                 case "8D":
                                     CDOL cdol2 = new CDOL();
-                                    foreach (EmvTlv subtag in tag.Children)
+
+                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9A });
+                                    if (tagIndex >= 0)
                                     {
-                                        switch (subtag.Tag.Hex)
-                                        {
-                                            case "9A":
-                                                cdol2.TransactionDate = subtag.Length.ToString();
-                                                break;
-                                            case "9F37":
-                                                cdol2.UnpredictableNumber = subtag.Length.ToString();
-                                                break;
-                                            case "9F1A":
-                                                cdol2.TerminalCountryCode = subtag.Length.ToString();
-                                                break;
-                                            case "5F2A":
-                                                cdol2.TransactionCountryCode = subtag.Length.ToString();
-                                                break;
-                                            case "9C":
-                                                cdol2.TransactionType = subtag.Length.ToString();
-                                                break;
-                                            case "9F02":
-                                                cdol2.AmountAuthorised = subtag.Length.ToString();
-                                                break;
-                                            case "9F03":
-                                                cdol2.AmountOther = subtag.Length.ToString();
-                                                break;
-                                            case "95":
-                                                cdol2.TerminalVerificationResults = subtag.Length.ToString();
-                                                break;
-                                            case "8A":
-                                                cdol2.AuthorizationResponseCode = subtag.Length.ToString();
-                                                break;
-                                            case "9F35":
-                                                cdol2.TerminalType = subtag.Length.ToString();
-                                                break;
-                                            case "9F45":
-                                                cdol2.DataAuthenticationCode = subtag.Length.ToString();
-                                                break;
-                                            case "9F4C":
-                                                cdol2.IccDynamicNumber = subtag.Length.ToString();
-                                                break;
-                                            case "91":
-                                                cdol2.IssuerAuthenticationData = subtag.Length.ToString();
-                                                break;
-                                        }
+                                        cdol2.TransactionDate = tag.Value.Bytes[tagIndex + 1].ToString();
                                     }
+
+                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9F, 0x37 });
+                                    if (tagIndex >= 0)
+                                    {
+                                        cdol2.UnpredictableNumber = tag.Value.Bytes[tagIndex + 2].ToString();
+                                    }
+
+                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9F, 0x1A });
+                                    if (tagIndex >= 0)
+                                    {
+                                        cdol2.TerminalCountryCode = tag.Value.Bytes[tagIndex + 2].ToString();
+                                    }
+
+                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x5F, 0x2A });
+                                    if (tagIndex >= 0)
+                                    {
+                                        cdol2.TransactionCountryCode = tag.Value.Bytes[tagIndex + 2].ToString();
+                                    }
+
+                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9C });
+                                    if (tagIndex >= 0)
+                                    {
+                                        cdol2.TransactionType = tag.Value.Bytes[tagIndex + 1].ToString();
+                                    }
+
+                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9F, 0x02 });
+                                    if (tagIndex >= 0)
+                                    {
+                                        cdol2.AmountAuthorised = tag.Value.Bytes[tagIndex + 2].ToString();
+                                    }
+
+                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9F, 0x03 });
+                                    if (tagIndex >= 0)
+                                    {
+                                        cdol2.AmountOther = tag.Value.Bytes[tagIndex + 2].ToString();
+                                    }
+
+                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x95 });
+                                    if (tagIndex >= 0)
+                                    {
+                                        cdol2.TerminalVerificationResults = tag.Value.Bytes[tagIndex + 1].ToString();
+                                    }
+
+                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x8A });
+                                    if (tagIndex >= 0)
+                                    {
+                                        cdol2.AuthorizationResponseCode = tag.Value.Bytes[tagIndex + 1].ToString();
+                                    }
+
+                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9F, 0x35 });
+                                    if (tagIndex >= 0)
+                                    {
+                                        cdol2.TerminalType = tag.Value.Bytes[tagIndex + 2].ToString();
+                                    }
+
+                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9F, 0x45 });
+                                    if (tagIndex >= 0)
+                                    {
+                                        cdol2.DataAuthenticationCode = tag.Value.Bytes[tagIndex + 2].ToString();
+                                    }
+
+                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9F, 0x4C });
+                                    if (tagIndex >= 0)
+                                    {
+                                        cdol2.IccDynamicNumber = tag.Value.Bytes[tagIndex + 2].ToString();
+                                    }
+
+                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x91 });
+                                    if (tagIndex >= 0)
+                                    {
+                                        cdol2.IssuerAuthenticationData = tag.Value.Bytes[tagIndex + 1].ToString();
+                                    }
+
                                     adf.CDOL2 = cdol2;
                                     break;
                                 case "5A":
@@ -856,7 +924,7 @@ namespace EMVCardReader
                                     adf.ApplicationVersionNumber = DataProcessor.ByteArrayToHexString(tag.Value.Bytes, true);
                                     break;
                                 case "5F28":
-                                    adf.IssuerCountryCode = DataProcessor.ByteArrayToIntString(tag.Value.Bytes);
+                                    adf.IssuerCountryCode = DataProcessor.ByteArrayToHexString(tag.Value.Bytes);
                                     break;
                                 case "8E":
                                     adf.CVMList = DataProcessor.ByteArrayToHexString(tag.Value.Bytes, true);

@@ -70,6 +70,11 @@ namespace EMVCardReader
                     {
                         break;
                     }
+
+                    if (tag.Length == j + 1)
+                    {
+                        return i;
+                    }
                 }
             }
             return -1;
@@ -201,12 +206,7 @@ namespace EMVCardReader
         /// <returns>Integer equivalent of the byte array as a string</returns>
         public static string ByteArrayToIntString(byte[] ba)
         {
-            if (BitConverter.IsLittleEndian)
-            {
-                Array.Reverse(ba);
-            }
-
-            return BitConverter.ToInt32(ba, 0).ToString();
+            return Convert.ToInt32(ByteArrayToHexString(ba), 16).ToString();
         }
     }
 }
