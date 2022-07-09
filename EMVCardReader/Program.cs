@@ -269,6 +269,7 @@ namespace EMVCardReader
         private static List<byte[]> GetAidsFromPSE(IsoReader isoReader)
         {
             List<byte[]> AvailableAIDs = new List<byte[]>();
+
             // Select PSE
             Response response = SelectFileCommand(isoReader, DataProcessor.AsciiStringToByteArray("1PAY.SYS.DDF01"));
 
@@ -781,14 +782,14 @@ namespace EMVCardReader
             {
                 Response response = SelectFileCommand(isoReader, DataProcessor.HexStringToByteArray(aid));
 
-                if (response.SW1 == 0x61 || (response.SW1 == 0x90 && response.SW2 == 0x00))
+                if (response.SW1 == 0x61)
                 {
                     response = GetResponseCommand(isoReader, response.SW2);
+                }
 
-                    if (response.SW1 == 0x90 && response.SW2 == 0x00)
-                    {
-                        candidateList.Add(DataProcessor.HexStringToByteArray(aid));
-                    }
+                if (response.SW1 == 0x90 && response.SW2 == 0x00)
+                {
+                    candidateList.Add(DataProcessor.HexStringToByteArray(aid));
                 }
             }
 
@@ -1155,6 +1156,24 @@ namespace EMVCardReader
 
 
 
+
+        /// <summary>
+        /// SELECT MF file APDU command.
+        /// </summary>
+        /// <param name="isoReader">The instance of the currently used ISO/IEC 7816 compliant reader</param>
+        /// <returns>APDU response of the command</returns>
+        private static Response SelectMFCommand(IsoReader isoReader)
+        {
+            CommandApdu command = new CommandApdu(IsoCase.Case2Short, isoReader.ActiveProtocol)
+            {
+                CLA = 0x00,
+                Instruction = InstructionCode.SelectFile,
+                P1 = 0x00,
+                P2 = 0x00,
+            };
+
+            return isoReader.Transmit(command);
+        }
 
         /// <summary>
         /// SELECT file APDU command.
