@@ -49,13 +49,13 @@ namespace EMVCardReader
 
                         switch (choice)
                         {
+                            // Select a card reader
                             case "0":
-                                // Select a card reader
                                 string[] readerNames = context.GetReaders();
                                 if (readerNames == null || readerNames.Length < 1)
                                 {
                                     Console.WriteLine();
-                                    Console.WriteLine("No card readers found.");
+                                    Console.WriteLine("ERROR: No card readers found.");
                                     Console.WriteLine();
                                 }
                                 else
@@ -67,12 +67,14 @@ namespace EMVCardReader
                                     Console.WriteLine();
                                 }
                                 break;
+
+                            // Check if card reader still connected
                             case "1":
-                                // Check if card reader still connected
+                                // If a reader is not selected
                                 if (string.IsNullOrEmpty(SelectedReader))
                                 {
                                     Console.WriteLine();
-                                    Console.WriteLine("No card readers selected. Select a reader first.");
+                                    Console.WriteLine("ERROR: No card readers selected. Select a reader first.");
                                     Console.WriteLine();
                                 }
                                 else
@@ -80,58 +82,83 @@ namespace EMVCardReader
                                     using (IsoReader isoReader = new IsoReader(context, SelectedReader, SCardShareMode.Shared, SCardProtocol.Any, false))
                                     {
                                         Console.WriteLine();
+                                        Console.Write("Checking if the card reader is connected. Please wait...");
 
+                                        // Trying to read the Cold ATR from the card
                                         if (GetColdAtr(context).Length > 0)
                                         {
+                                            Console.WriteLine();
                                             Console.WriteLine("true");
+                                            Console.WriteLine();
                                         }
                                         else
                                         {
+                                            Console.WriteLine();
                                             Console.WriteLine("false");
+                                            Console.WriteLine();
                                         }
-                                        
-                                        Console.WriteLine();
                                     }
                                 }
                                 break;
+
+                            // Check card type
                             case "2":
-                                // Check card type
-                                Console.WriteLine();
+                                // If a reader is not selected
                                 if (string.IsNullOrEmpty(SelectedReader))
                                 {
-                                    Console.WriteLine("No card readers selected. Select a reader first.");
+                                    Console.WriteLine();
+                                    Console.WriteLine("ERROR: No card readers selected. Select a reader first.");
+                                    Console.WriteLine();
                                 }
                                 else
                                 {
+                                    Console.WriteLine();
                                     Console.Write("Determining card type. Please wait...");
-                                    string cardType = GetCardType(context);
 
+                                    string cardType = GetCardType(context);
                                     if (cardType == null)
                                     {
                                         Console.WriteLine();
-                                        Console.WriteLine("Card type cannot be determined.");
+                                        Console.WriteLine("ERROR: Card type cannot be determined.");
+                                        Console.WriteLine();
                                     }
                                     else
                                     {
                                         Console.WriteLine();
                                         Console.WriteLine(cardType);
+                                        Console.WriteLine();
                                     }
                                 }
-                                Console.WriteLine();
                                 break;
+
+                            // Get card details and display
                             case "3":
-                                // Get card details and display
-                                GenerateCardDetails(context);
+                                // If a reader is not selected
+                                if (string.IsNullOrEmpty(SelectedReader))
+                                {
+                                    Console.WriteLine();
+                                    Console.WriteLine("ERROR: No card readers selected. Select a reader first.");
+                                    Console.WriteLine();
+                                }
+                                else
+                                {
+                                    Console.WriteLine();
+                                    Console.Write("Reading card data. Please wait...");
 
-                                string jsonData = SerializeDataToJson();
+                                    GenerateCardDetails(context);
 
-                                DisplayData(jsonData);
+                                    string jsonData = SerializeDataToJson();
+
+                                    DisplayData(jsonData);
+                                }
                                 break;
+
+                            // Exit application
                             case "4":
-                                // Exit application
                                 return 0;
+
                             default:
-                                Console.WriteLine("An invalid number has been entered.");
+                                Console.WriteLine("ERROR: An invalid number has been entered.");
                                 Console.WriteLine();
                                 break;
                         }
@@ -407,8 +434,6 @@ namespace EMVCardReader
         /// <param name="context">The card context</param>
         private static void GenerateCardDetails(ISCardContext context)
         {
-            Console.Write("Reading card data. Please wait...");
-
             using (IsoReader isoReader = new IsoReader(context, SelectedReader, SCardShareMode.Shared, SCardProtocol.Any, false))
             {
                 CardData.ColdATR = GetColdAtr(context);
@@ -948,166 +973,104 @@ namespace EMVCardReader
                                     break;
                                 case "8C":
                                     CDOL cdol1 = new CDOL();
+                                    EmvTlvList dol = EmvTagParser.ParseDol(tag.Value.Bytes);
 
-                                    int tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9A });
-                                    if (tagIndex >= 0)
+                                    foreach (EmvTlv dolTag in dol)
                                     {
-                                        cdol1.TransactionDate = tag.Value.Bytes[tagIndex + 1].ToString();
-                                    }
-
-                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9F, 0x37 });
-                                    if (tagIndex >= 0)
-                                    {
-                                        cdol1.UnpredictableNumber = tag.Value.Bytes[tagIndex + 2].ToString();
-                                    }
-
-                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9F, 0x1A });
-                                    if (tagIndex >= 0)
-                                    {
-                                        cdol1.TerminalCountryCode = tag.Value.Bytes[tagIndex + 2].ToString();
-                                    }
-
-                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x5F, 0x2A });
-                                    if (tagIndex >= 0)
-                                    {
-                                        cdol1.TransactionCountryCode = tag.Value.Bytes[tagIndex + 2].ToString();
-                                    }
-
-                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9C });
-                                    if (tagIndex >= 0)
-                                    {
-                                        cdol1.TransactionType = tag.Value.Bytes[tagIndex + 1].ToString();
-                                    }
-
-                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9F, 0x02 });
-                                    if (tagIndex >= 0)
-                                    {
-                                        cdol1.AmountAuthorised = tag.Value.Bytes[tagIndex + 2].ToString();
-                                    }
-
-                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9F, 0x03 });
-                                    if (tagIndex >= 0)
-                                    {
-                                        cdol1.AmountOther = tag.Value.Bytes[tagIndex + 2].ToString();
-                                    }
-
-                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x95 });
-                                    if (tagIndex >= 0)
-                                    {
-                                        cdol1.TerminalVerificationResults = tag.Value.Bytes[tagIndex + 1].ToString();
-                                    }
-
-                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x8A });
-                                    if (tagIndex >= 0)
-                                    {
-                                        cdol1.AuthorizationResponseCode = tag.Value.Bytes[tagIndex + 1].ToString();
-                                    }
-
-                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9F, 0x35 });
-                                    if (tagIndex >= 0)
-                                    {
-                                        cdol1.TerminalType = tag.Value.Bytes[tagIndex + 2].ToString();
-                                    }
-
-                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9F, 0x45 });
-                                    if (tagIndex >= 0)
-                                    {
-                                        cdol1.DataAuthenticationCode = tag.Value.Bytes[tagIndex + 2].ToString();
-                                    }
-
-                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9F, 0x4C });
-                                    if (tagIndex >= 0)
-                                    {
-                                        cdol1.IccDynamicNumber = tag.Value.Bytes[tagIndex + 2].ToString();
-                                    }
-
-                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x91 });
-                                    if (tagIndex >= 0)
-                                    {
-                                        cdol1.IssuerAuthenticationData = tag.Value.Bytes[tagIndex + 1].ToString();
+                                        switch (dolTag.Tag.Hex)
+                                        {
+                                            case "9A":
+                                                cdol1.TransactionDate = dolTag.Length.ToString();
+                                                break;
+                                            case "9F37":
+                                                cdol1.UnpredictableNumber = dolTag.Length.ToString();
+                                                break;
+                                            case "9F1A":
+                                                cdol1.TerminalCountryCode = dolTag.Length.ToString();
+                                                break;
+                                            case "5F2A":
+                                                cdol1.TransactionCountryCode = dolTag.Length.ToString();
+                                                break;
+                                            case "9C":
+                                                cdol1.TransactionType = dolTag.Length.ToString();
+                                                break;
+                                            case "9F02":
+                                                cdol1.AmountAuthorised = dolTag.Length.ToString();
+                                                break;
+                                            case "9F03":
+                                                cdol1.AmountOther = dolTag.Length.ToString();
+                                                break;
+                                            case "95":
+                                                cdol1.TerminalVerificationResults = dolTag.Length.ToString();
+                                                break;
+                                            case "8A":
+                                                cdol1.AuthorizationResponseCode = dolTag.Length.ToString();
+                                                break;
+                                            case "9F35":
+                                                cdol1.TerminalType = dolTag.Length.ToString();
+                                                break;
+                                            case "9F45":
+                                                cdol1.DataAuthenticationCode = dolTag.Length.ToString();
+                                                break;
+                                            case "9F4C":
+                                                cdol1.IccDynamicNumber = dolTag.Length.ToString();
+                                                break;
+                                            case "91":
+                                                cdol1.IssuerAuthenticationData = dolTag.Length.ToString();
+                                                break;
+                                        }
                                     }
 
                                     adf.CDOL1 = cdol1;
                                     break;
                                 case "8D":
                                     CDOL cdol2 = new CDOL();
+                                    dol = EmvTagParser.ParseDol(tag.Value.Bytes);
 
-                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9A });
-                                    if (tagIndex >= 0)
+                                    foreach (EmvTlv dolTag in dol)
                                     {
-                                        cdol2.TransactionDate = tag.Value.Bytes[tagIndex + 1].ToString();
-                                    }
-
-                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9F, 0x37 });
-                                    if (tagIndex >= 0)
-                                    {
-                                        cdol2.UnpredictableNumber = tag.Value.Bytes[tagIndex + 2].ToString();
-                                    }
-
-                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9F, 0x1A });
-                                    if (tagIndex >= 0)
-                                    {
-                                        cdol2.TerminalCountryCode = tag.Value.Bytes[tagIndex + 2].ToString();
-                                    }
-
-                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x5F, 0x2A });
-                                    if (tagIndex >= 0)
-                                    {
-                                        cdol2.TransactionCountryCode = tag.Value.Bytes[tagIndex + 2].ToString();
-                                    }
-
-                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9C });
-                                    if (tagIndex >= 0)
-                                    {
-                                        cdol2.TransactionType = tag.Value.Bytes[tagIndex + 1].ToString();
-                                    }
-
-                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9F, 0x02 });
-                                    if (tagIndex >= 0)
-                                    {
-                                        cdol2.AmountAuthorised = tag.Value.Bytes[tagIndex + 2].ToString();
-                                    }
-
-                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9F, 0x03 });
-                                    if (tagIndex >= 0)
-                                    {
-                                        cdol2.AmountOther = tag.Value.Bytes[tagIndex + 2].ToString();
-                                    }
-
-                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x95 });
-                                    if (tagIndex >= 0)
-                                    {
-                                        cdol2.TerminalVerificationResults = tag.Value.Bytes[tagIndex + 1].ToString();
-                                    }
-
-                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x8A });
-                                    if (tagIndex >= 0)
-                                    {
-                                        cdol2.AuthorizationResponseCode = tag.Value.Bytes[tagIndex + 1].ToString();
-                                    }
-
-                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9F, 0x35 });
-                                    if (tagIndex >= 0)
-                                    {
-                                        cdol2.TerminalType = tag.Value.Bytes[tagIndex + 2].ToString();
-                                    }
-
-                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9F, 0x45 });
-                                    if (tagIndex >= 0)
-                                    {
-                                        cdol2.DataAuthenticationCode = tag.Value.Bytes[tagIndex + 2].ToString();
-                                    }
-
-                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x9F, 0x4C });
-                                    if (tagIndex >= 0)
-                                    {
-                                        cdol2.IccDynamicNumber = tag.Value.Bytes[tagIndex + 2].ToString();
-                                    }
-
-                                    tagIndex = DataProcessor.SearchTag(tag.Value.Bytes, new byte[] { 0x91 });
-                                    if (tagIndex >= 0)
-                                    {
-                                        cdol2.IssuerAuthenticationData = tag.Value.Bytes[tagIndex + 1].ToString();
+                                        switch (dolTag.Tag.Hex)
+                                        {
+                                            case "9A":
+                                                cdol2.TransactionDate = dolTag.Length.ToString();
+                                                break;
+                                            case "9F37":
+                                                cdol2.UnpredictableNumber = dolTag.Length.ToString();
+                                                break;
+                                            case "9F1A":
+                                                cdol2.TerminalCountryCode = dolTag.Length.ToString();
+                                                break;
+                                            case "5F2A":
+                                                cdol2.TransactionCountryCode = dolTag.Length.ToString();
+                                                break;
+                                            case "9C":
+                                                cdol2.TransactionType = dolTag.Length.ToString();
+                                                break;
+                                            case "9F02":
+                                                cdol2.AmountAuthorised = dolTag.Length.ToString();
+                                                break;
+                                            case "9F03":
+                                                cdol2.AmountOther = dolTag.Length.ToString();
+                                                break;
+                                            case "95":
+                                                cdol2.TerminalVerificationResults = dolTag.Length.ToString();
+                                                break;
+                                            case "8A":
+                                                cdol2.AuthorizationResponseCode = dolTag.Length.ToString();
+                                                break;
+                                            case "9F35":
+                                                cdol2.TerminalType = dolTag.Length.ToString();
+                                                break;
+                                            case "9F45":
+                                                cdol2.DataAuthenticationCode = dolTag.Length.ToString();
+                                                break;
+                                            case "9F4C":
+                                                cdol2.IccDynamicNumber = dolTag.Length.ToString();
+                                                break;
+                                            case "91":
+                                                cdol2.IssuerAuthenticationData = dolTag.Length.ToString();
+                                                break;
+                                        }
                                     }
 
                                     adf.CDOL2 = cdol2;
