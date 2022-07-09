@@ -1259,33 +1259,38 @@ namespace EMVCardReader
                     if (tlv.Tag.Hex == "9F66" && tlv.Length == 4)
                     {
                         // Terminal Transaction Qualifiers (VISA)
-                        data = DataProcessor.AddBytesToArray(data, new byte[] { 0x30, 0x00, 0x00, 0x00 });
+                        data = DataProcessor.AddBytesToArrayEnd(data, new byte[] { 0x30, 0x00, 0x00, 0x00 });
                     }
                     else if (tlv.Tag.Hex == "9F1A" && tlv.Length == 2)
                     {
                         // Terminal country code
-                        data = DataProcessor.AddBytesToArray(data, new byte[] { 0x02, 0x50 });
+                        data = DataProcessor.AddBytesToArrayEnd(data, new byte[] { 0x02, 0x50 });
                     }
                     else if (tlv.Tag.Hex == "5F2A" && tlv.Length == 2)
                     {
                         // Transaction currency code
-                        data = DataProcessor.AddBytesToArray(data, new byte[] { 0x09, 0x78 });
+                        data = DataProcessor.AddBytesToArrayEnd(data, new byte[] { 0x09, 0x78 });
                     }
                     else if (tlv.Tag.Hex == "9A" && tlv.Length == 3)
                     {
                         // Transaction date
-                        data = DataProcessor.AddBytesToArray(data, DataProcessor.HexStringToByteArray(DataProcessor.AsciiStringToHexString(DateTime.Now.ToString("yyMMdd"), false)));
+                        data = DataProcessor.AddBytesToArrayEnd(data, DataProcessor.HexStringToByteArray(DataProcessor.AsciiStringToHexString(DateTime.Now.ToString("yyMMdd"), false)));
+                    }
+                    else if (tlv.Tag.Hex == "9F35" && tlv.Length == 1)
+                    {
+                        // Terminal type
+                        data = DataProcessor.AddBytesToArrayEnd(data, new byte[] { 0xEA });
                     }
                     else if (tlv.Tag.Hex == "9F37" && tlv.Length == 4)
                     {
                         // Transaction currency code
-                        data = DataProcessor.AddBytesToArray(data, new byte[] { 0xDE, 0xAD, 0xBE, 0xEF });
+                        data = DataProcessor.AddBytesToArrayEnd(data, new byte[] { 0xDE, 0xAD, 0xBE, 0xEF });
                     }
                     else
                     {
                         for (int i = 0; i < tlv.Length; i++)
                         {
-                            data = DataProcessor.AddBytesToArray(data, new byte[] { 0x00 });
+                            data = DataProcessor.AddBytesToArrayEnd(data, new byte[] { 0x00 });
                         }
                     }
                 }
@@ -1298,7 +1303,7 @@ namespace EMVCardReader
         /// <summary>
         /// GET PROCESSING OPTIONS APDU command.
         /// </summary>
-        /// v
+        /// <param name="isoReader">The instance of the currently used ISO/IEC 7816 compliant reader</param>
         /// <param name="PDOL">The processed PDOL data block as a byte array</param>
         /// <returns>APDU response of the command</returns>
         private static Response GetProcessingOptionsCommand(IsoReader isoReader, byte[] PDOL)

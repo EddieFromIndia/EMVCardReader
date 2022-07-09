@@ -81,18 +81,36 @@ namespace EMVCardReader
         }
 
         /// <summary>
-        /// Adds a byte array in the end of another byte array.
+        /// Adds a byte array in the beginning of another byte array.
         /// </summary>
         /// <param name="bArray"></param>
         /// <param name="newBytes"></param>
         /// <returns>The added byte array</returns>
-        public static byte[] AddBytesToArray(byte[] bArray, byte[] newBytes)
+        public static byte[] AddBytesToArrayStart(byte[] bArray, byte[] newBytes)
         {
             byte[] newArray = new byte[bArray.Length + newBytes.Length];
             bArray.CopyTo(newArray, newBytes.Length);
             for (int i = 0; i < newBytes.Length; i++)
             {
                 newArray[i] = newBytes[i];
+            }
+
+            return newArray;
+        }
+
+        /// <summary>
+        /// Adds a byte array in the end of another byte array.
+        /// </summary>
+        /// <param name="bArray"></param>
+        /// <param name="newBytes"></param>
+        /// <returns>The added byte array</returns>
+        public static byte[] AddBytesToArrayEnd(byte[] bArray, byte[] newBytes)
+        {
+            byte[] newArray = new byte[bArray.Length + newBytes.Length];
+            bArray.CopyTo(newArray, 0);
+            for (int i = 0; i < newBytes.Length; i++)
+            {
+                newArray[bArray.Length + i] = newBytes[i];
             }
 
             return newArray;
