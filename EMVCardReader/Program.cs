@@ -439,8 +439,11 @@ namespace EMVCardReader
             {
                 CardData.ColdATR = GetColdAtr(context);
 
-                bool aidListGenerated = ProcessPSE(isoReader);
-                if (!aidListGenerated)
+                // Generate AID list from PSE
+                ProcessPSE(isoReader, "1PAY.SYS.DDF01");
+                ProcessPSE(isoReader, "2PAY.SYS.DDF01");
+
+                if (CardData.AvailableAIDs.Count == 0)
                 {
                     // Generate AID list manually
                     CardData.AvailableAIDs = GenerateCandidateList(isoReader);
@@ -452,6 +455,8 @@ namespace EMVCardReader
                         });
                     }
                 }
+
+                CardData.AvailableAIDs = CardData.AvailableAIDs.Distinct().ToList();
 
                 WarmReset(isoReader);
 
@@ -495,22 +500,16 @@ namespace EMVCardReader
         /// </summary>
         /// <param name="isoReader">The instance of the currently used ISO/IEC 7816 compliant reader.</param>
         /// <returns>True if the PSE is processed successfully, else false</returns>
-        private static bool ProcessPSE(IsoReader isoReader)
+        private static void ProcessPSE(IsoReader isoReader, string dfName)
         {
             // Select PSE
-            Response response = SelectFileCommand(isoReader, DataProcessor.AsciiStringToByteArray("1PAY.SYS.DDF01"));
+            Response response = SelectFileCommand(isoReader, DataProcessor.AsciiStringToByteArray(dfName));
 
             // Might be a french card
             if (response.SW1 == 0x6E && response.SW2 == 0x00)
             {
                 WarmReset(isoReader);
-                response = SelectFileCommand(isoReader, DataProcessor.AsciiStringToByteArray("1PAY.SYS.DDF01"));
-            }
-
-            // Might be a contactless card
-            if (response.SW1 == 0x6A && response.SW2 == 0x82)
-            {
-                return ProcessPPSE(isoReader);
+                response = SelectFileCommand(isoReader, DataProcessor.AsciiStringToByteArray(dfName));
             }
 
             if (response.SW1 == 0x61)
@@ -520,7 +519,7 @@ namespace EMVCardReader
 
             if (!(response.SW1 == 0x90 && response.SW2 == 0x00))
             {
-                return false;
+                return;
             }
 
             CardData.FCIofDDF = response.GetData();
@@ -563,72 +562,6 @@ namespace EMVCardReader
                     record++;
                 } while (triesLeft > 0);
             }
-
-            return true;
-        }
-
-        /// <summary>
-        /// Processes the PPSE and generates the supported application list.
-        /// </summary>
-        /// <param name="isoReader">The instance of the currently used ISO/IEC 7816 compliant reader</param>
-        /// <returns>True if the PPSE is processed successfully, else false</returns>
-        private static bool ProcessPPSE(IsoReader isoReader)
-        {
-            // Select PPSE
-            Response response = SelectFileCommand(isoReader, DataProcessor.AsciiStringToByteArray("2PAY.SYS.DDF01"));
-
-            if (response.SW1 == 0x61)
-            {
-                response = GetResponseCommand(isoReader, response.SW2);
-            }
-
-            if (!(response.SW1 == 0x90 && response.SW2 == 0x00))
-            {
-                return false;
-            }
-
-            CardData.FCIofDDFContactless = response.GetData();
-
-            // Extract SFI
-            EmvTlvList FCIofDDFTags = EmvTlvList.Parse(CardData.FCIofDDFContactless);
-            if (FCIofDDFTags[0].Children[1].Children[0].Tag.Hex == "88")
-            {
-                int sfi = FCIofDDFTags[0].Children[1].Children[0].Value.Bytes[0];
-                int record = 1;
-                int triesLeft = 5;
-
-                do
-                {
-                    response = ReadRecordCommand(isoReader, record++, sfi);
-
-                    if (response.SW1 == 0x6C && response.SW2 != 0x00)
-                    {
-                        response = ReadRecordCommand(isoReader, record, sfi, response.SW2);
-                    }
-
-                    // Generate list of AIDs
-                    if (response.SW1 == 0x90 && response.SW2 == 0x00)
-                    {
-                        byte[] FCI = response.GetData();
-                        CardData.AvailableAIDs.Add(DataProcessor.GetDataObject(FCI, new byte[] { 0x4f }));
-                        CardData.AvailableADFs.Add(new ADFModel()
-                        {
-                            AID = CardData.AvailableAIDs[CardData.AvailableAIDs.Count - 1],
-                        });
-                        continue;
-                    }
-
-                    // Some cards have records starting from 4 or 5,
-                    // so, don't quit until 5 records are checked.
-                    if (record > 5)
-                    {
-                        triesLeft--;
-                    }
-                    record++;
-                } while (triesLeft > 0);
-            }
-
-            return true;
         }
 
         /// <summary>
@@ -1156,24 +1089,6 @@ namespace EMVCardReader
 
 
 
-
-        /// <summary>
-        /// SELECT MF file APDU command.
-        /// </summary>
-        /// <param name="isoReader">The instance of the currently used ISO/IEC 7816 compliant reader</param>
-        /// <returns>APDU response of the command</returns>
-        private static Response SelectMFCommand(IsoReader isoReader)
-        {
-            CommandApdu command = new CommandApdu(IsoCase.Case2Short, isoReader.ActiveProtocol)
-            {
-                CLA = 0x00,
-                Instruction = InstructionCode.SelectFile,
-                P1 = 0x00,
-                P2 = 0x00,
-            };
-
-            return isoReader.Transmit(command);
-        }
 
         /// <summary>
         /// SELECT file APDU command.
