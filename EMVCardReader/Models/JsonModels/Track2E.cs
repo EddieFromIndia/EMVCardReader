@@ -16,7 +16,7 @@ namespace EMVCardReader.Models
         [JsonProperty("Discretionary Data", NullValueHandling = NullValueHandling.Ignore)]
         public string DiscretionaryData { get; set; }
 
-        [JsonProperty("Cheсk Digit", NullValueHandling = NullValueHandling.Ignore)]
+        [JsonProperty("Check Digit", NullValueHandling = NullValueHandling.Ignore)]
         public string CheckDigit { get; set; }
 
         [JsonProperty("Account Number", NullValueHandling = NullValueHandling.Ignore)]

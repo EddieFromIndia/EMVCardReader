@@ -8,7 +8,7 @@ namespace EMVCardReader.Models
         public byte[] ADF { get; set; }
         public byte[] ProcessingOptions { get; set; }
         public byte[] PDOL { get; set; }
-        public List<RecordModel> AEFs { get; set; } = new List<RecordModel>();
+        public List<byte[]> AEFs { get; set; } = new List<byte[]>();
         public byte[] ATC { get; set; }
         public byte[] LastOnlineATCRegister { get; set; }
         public byte[] PinTryCounter { get; set; }

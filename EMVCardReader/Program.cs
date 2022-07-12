@@ -3,12 +3,11 @@ using EMVCardReader.Models;
 using Great.EmvTags;
 using Newtonsoft.Json;
 using PCSC;
+using PCSC.Exceptions;
 using PCSC.Iso7816;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.Remoting.Contexts;
-using System.Text.RegularExpressions;
 
 namespace EMVCardReader
 {
@@ -39,19 +38,21 @@ namespace EMVCardReader
         {
             Console.WriteLine("------------------------------------------------");
             Console.WriteLine("                EMV Card Reader");
-            try
-            {
-                using (ISCardContext context = ContextFactory.Instance.Establish(SCardScope.System))
-                {
-                    while (true)
-                    {
-                        string choice = DisplaySelectionMenu();
 
-                        switch (choice)
+            while (true)
+            {
+                string choice = DisplaySelectionMenu();
+
+                switch (choice)
+                {
+                    // Select a card reader
+                    case "0":
+                        try
                         {
-                            // Select a card reader
-                            case "0":
+                            using (ISCardContext context = ContextFactory.Instance.Establish(SCardScope.System))
+                            {
                                 string[] readerNames = context.GetReaders();
+
                                 if (readerNames == null || readerNames.Length < 1)
                                 {
                                     Console.WriteLine();
@@ -66,24 +67,89 @@ namespace EMVCardReader
                                     Console.WriteLine("The card reader has been selected.");
                                     Console.WriteLine();
                                 }
-                                break;
+                            }
 
-                            // Check if card reader still connected
-                            case "1":
-                                // If a reader is not selected
-                                if (string.IsNullOrEmpty(SelectedReader))
+                        }
+                        catch (Exception e)
+                        {
+                            Console.WriteLine();
+                            Console.WriteLine(e.Message);
+                            Console.WriteLine();
+                        }
+                        break;
+
+                    // Check if card reader still connected
+                    case "1":
+                        // If a reader is not selected
+                        if (string.IsNullOrEmpty(SelectedReader))
+                        {
+                            Console.WriteLine();
+                            Console.WriteLine("There is no such card reader.");
+                            Console.WriteLine();
+                        }
+                        else
+                        {
+                            Console.WriteLine();
+                            Console.Write("Checking if the card reader is connected. Please wait...");
+
+                            try
+                            {
+                                using (ISCardContext context = ContextFactory.Instance.Establish(SCardScope.System))
                                 {
-                                    Console.WriteLine();
-                                    Console.WriteLine("ERROR: No card readers selected. Select a reader first.");
-                                    Console.WriteLine();
+                                    string[] readerNames = context.GetReaders();
+
+                                    if (readerNames != null && readerNames.Length > 0)
+                                    {
+                                        if (readerNames.Contains(SelectedReader))
+                                        {
+                                            Console.WriteLine();
+                                            Console.WriteLine("true");
+                                            Console.WriteLine();
+                                        }
+                                        else
+                                        {
+                                            Console.WriteLine();
+                                            Console.WriteLine("false");
+                                            Console.WriteLine();
+                                        }
+                                    }
+                                    else
+                                    {
+                                        Console.WriteLine();
+                                        Console.WriteLine("There is no such card reader.");
+                                        Console.WriteLine();
+                                    }
                                 }
-                                else
+                            }
+                            catch (Exception)
+                            {
+                                Console.WriteLine();
+                                Console.WriteLine("false");
+                                Console.WriteLine();
+                            }
+                        }
+                        break;
+
+                    // Check if card is inserted in the reader
+                    case "2":
+                        // If a reader is not selected
+                        if (string.IsNullOrEmpty(SelectedReader))
+                        {
+                            Console.WriteLine();
+                            Console.WriteLine("There is no such card reader.");
+                            Console.WriteLine();
+                        }
+                        else
+                        {
+                            Console.WriteLine();
+                            Console.Write("Checking if a card is inserted. Please wait...");
+
+                            try
+                            {
+                                using (ISCardContext context = ContextFactory.Instance.Establish(SCardScope.System))
                                 {
                                     using (IsoReader isoReader = new IsoReader(context, SelectedReader, SCardShareMode.Shared, SCardProtocol.Any, false))
                                     {
-                                        Console.WriteLine();
-                                        Console.Write("Checking if the card reader is connected. Please wait...");
-
                                         // Trying to read the Cold ATR from the card
                                         if (GetColdAtr(context).Length > 0)
                                         {
@@ -99,22 +165,40 @@ namespace EMVCardReader
                                         }
                                     }
                                 }
-                                break;
+                            }
+                            catch (RemovedCardException)
+                            {
+                                Console.WriteLine();
+                                Console.WriteLine("false");
+                                Console.WriteLine();
+                            }
+                            catch (Exception e)
+                            {
+                                Console.WriteLine();
+                                Console.WriteLine(e.Message);
+                                Console.WriteLine();
+                            }
+                        }
+                        break;
 
-                            // Check card type
-                            case "2":
-                                // If a reader is not selected
-                                if (string.IsNullOrEmpty(SelectedReader))
-                                {
-                                    Console.WriteLine();
-                                    Console.WriteLine("ERROR: No card readers selected. Select a reader first.");
-                                    Console.WriteLine();
-                                }
-                                else
-                                {
-                                    Console.WriteLine();
-                                    Console.Write("Determining card type. Please wait...");
+                    // Check card type
+                    case "3":
+                        // If a reader is not selected
+                        if (string.IsNullOrEmpty(SelectedReader))
+                        {
+                            Console.WriteLine();
+                            Console.WriteLine("There is no such card reader.");
+                            Console.WriteLine();
+                        }
+                        else
+                        {
+                            Console.WriteLine();
+                            Console.Write("Determining card type. Please wait...");
 
+                            try
+                            {
+                                using (ISCardContext context = ContextFactory.Instance.Establish(SCardScope.System))
+                                {
                                     string cardType = GetCardType(context);
                                     if (cardType == null)
                                     {
@@ -129,48 +213,61 @@ namespace EMVCardReader
                                         Console.WriteLine();
                                     }
                                 }
-                                break;
 
-                            // Get card details and display
-                            case "3":
-                                // If a reader is not selected
-                                if (string.IsNullOrEmpty(SelectedReader))
-                                {
-                                    Console.WriteLine();
-                                    Console.WriteLine("ERROR: No card readers selected. Select a reader first.");
-                                    Console.WriteLine();
-                                }
-                                else
-                                {
-                                    Console.WriteLine();
-                                    Console.Write("Reading card data. Please wait...");
-
-                                    GenerateCardDetails(context);
-
-                                    string jsonData = SerializeDataToJson();
-
-                                    DisplayData(jsonData);
-                                }
-                                break;
-
-                            // Exit application
-                            case "4":
-                                return 0;
-
-                            default:
-                                Console.WriteLine("ERROR: An invalid number has been entered.");
+                            }
+                            catch (Exception e)
+                            {
                                 Console.WriteLine();
-                                break;
+                                Console.WriteLine(e.Message);
+                                Console.WriteLine();
+                            }
                         }
+                        break;
+
+                    // Get card details and display
+                    case "4":
+                        // If a reader is not selected
+                        if (string.IsNullOrEmpty(SelectedReader))
+                        {
+                            Console.WriteLine();
+                            Console.WriteLine("There is no such card reader.");
+                            Console.WriteLine();
+                        }
+                        else
+                        {
+                            Console.WriteLine();
+                            Console.Write("Reading card data. Please wait...");
+
+                            try
+                            {
+                                using (ISCardContext context = ContextFactory.Instance.Establish(SCardScope.System))
+                                {
+                                    GenerateCardDetails(context);
+                                }
+
+                                string jsonData = SerializeDataToJson();
+
+                                DisplayData(jsonData);
+                            }
+                            catch (Exception e)
+                            {
+                                Console.WriteLine();
+                                Console.WriteLine(e.Message);
+                                Console.WriteLine();
+                            }
+                        }
+                        break;
+
+                    // Exit application
+                    case "5":
+                        return 0;
+
+                    default:
+                        Console.WriteLine("ERROR: An invalid number has been entered.");
                         Console.WriteLine();
-                    }
+                        break;
                 }
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.Message);
-                Console.ReadKey();
-                return 1;
+                Console.WriteLine();
             }
         }
 
@@ -186,9 +283,10 @@ namespace EMVCardReader
             Console.WriteLine("------------------------------------------------");
             Console.WriteLine("[0] Select a card reader from a list of readers.");
             Console.WriteLine("[1] Check if the card reader is still connected.");
-            Console.WriteLine("[2] Check card type.");
-            Console.WriteLine("[3] Get card details.");
-            Console.WriteLine("[4] Exit application.");
+            Console.WriteLine("[2] Check if a card is inserted in the reader.");
+            Console.WriteLine("[3] Check card type.");
+            Console.WriteLine("[4] Get card details.");
+            Console.WriteLine("[5] Exit application.");
             Console.WriteLine();
             Console.Write("Choose an action: ");
             return Console.ReadLine();
@@ -590,13 +688,14 @@ namespace EMVCardReader
             CardData.AvailableADFs.FirstOrDefault(adf => adf.AID == AID).PDOL = PDOL;
 
             PDOL = BuildPdolDataBlock(PDOL);
-            
+
             response = GetProcessingOptionsCommand(isoReader, PDOL);
 
             if (!(response.SW1 == 0x90 && response.SW2 == 00))
             {
                 if (PDOL == defaultPDOL) // If PDOL is not present
                 {
+                    CardData.AvailableADFs.FirstOrDefault(adf => adf.AID == AID).AEFs = ForceReadRecord(isoReader);
                     return;
                 }
 
@@ -604,6 +703,7 @@ namespace EMVCardReader
 
                 if (!(response.SW1 == 0x90 && response.SW2 == 00))
                 {
+                    CardData.AvailableADFs.FirstOrDefault(adf => adf.AID == AID).AEFs = ForceReadRecord(isoReader);
                     return;
                 }
             }
@@ -668,7 +768,7 @@ namespace EMVCardReader
             {
                 int SFI = DataProcessor.ExtractSFI(afl[0]);
                 int RecordNumber = afl[1];
-                
+
                 do
                 {
                     response = ReadRecordCommand(isoReader, RecordNumber, SFI);
@@ -680,13 +780,59 @@ namespace EMVCardReader
 
                     if (response.SW1 == 0x90 && response.SW2 == 0x00)
                     {
-                        byte[] FCI = response.GetData();
-                        CardData.AvailableADFs.FirstOrDefault(adf => adf.AID == AID).AEFs.Add(new RecordModel() { AFL = afl, FCI = FCI });
+                        CardData.AvailableADFs.FirstOrDefault(adf => adf.AID == AID).AEFs.Add(response.GetData());
                     }
                     RecordNumber++;
 
                 } while (RecordNumber <= afl[2]);
             }
+        }
+
+        /// <summary>
+        /// Force reads AEF records.
+        /// </summary>
+        /// <param name="isoReader"></param>
+        /// <returns>Read AEF data</returns>
+        private static List<byte[]> ForceReadRecord(IsoReader isoReader)
+        {
+            List<byte[]> aefs = new List<byte[]>();
+
+            for (int sfi = 1; sfi <= 5; sfi++)
+            {
+                int record = 1;
+                int triesLeft = 5;
+
+                do
+                {
+                    Response response = ReadRecordCommand(isoReader, record++, sfi);
+
+                    if (response.SW1 == 0x6C && response.SW2 != 0x00)
+                    {
+                        response = ReadRecordCommand(isoReader, record, sfi, response.SW2);
+                    }
+
+                    // Generate AEFs
+                    if (response.SW1 == 0x90 && response.SW2 == 0x00)
+                    {
+                        if (response.HasData)
+                        {
+                            aefs.Add(response.GetData());
+                        }
+
+                        continue;
+                    }
+
+                    // Some cards have records starting from 4 or 5,
+                    // so, don't quit until 5 records are checked.
+                    if (record > 5)
+                    {
+                        triesLeft--;
+                    }
+                    record++;
+                } while (triesLeft > 0);
+            }
+
+            return aefs;
         }
 
         /// <summary>
@@ -735,6 +881,7 @@ namespace EMVCardReader
         /// <returns>The serialized data as JSON string</returns>
         private static string SerializeDataToJson()
         {
+            object dataObject;
             if (CardData.ColdATR != null)
             {
                 jsonData.ColdATR = DataProcessor.ByteArrayToHexString(CardData.ColdATR, true);
@@ -749,60 +896,99 @@ namespace EMVCardReader
 
             if (CardData.FCIofDDF != null)
             {
-                jsonData.TLV.Add(DecodeTLV(CardData.FCIofDDF));
+                dataObject = DecodeTLV(CardData.FCIofDDF);
+                if (dataObject != null)
+                {
+                    jsonData.TLV.Add(dataObject);
+                }
             }
 
             if (CardData.FCIofDDFContactless != null)
             {
-                jsonData.TLV.Add(DecodeTLV(CardData.FCIofDDFContactless));
+                dataObject = DecodeTLV(CardData.FCIofDDFContactless);
+                if (dataObject != null)
+                {
+                    jsonData.TLV.Add(dataObject);
+                }
             }
 
             foreach (ADFModel adf in CardData.AvailableADFs)
             {
                 if (adf.ADF != null)
                 {
-                    jsonData.TLV.Add(DecodeTLV(adf.ADF));
+                    dataObject = DecodeTLV(adf.ADF);
+                    if (dataObject != null)
+                    {
+                        jsonData.TLV.Add(dataObject);
+                    }
                 }
 
-                foreach (RecordModel aef in adf.AEFs)
+                foreach (byte[] aef in adf.AEFs)
                 {
-                    if (aef.FCI != null)
+                    if (aef != null)
                     {
-                        jsonData.TLV.Add(DecodeTLV(aef.FCI));
+                        dataObject = DecodeTLV(aef);
+                        if (dataObject != null)
+                        {
+                            jsonData.TLV.Add(dataObject);
+                        }
                     }
                 }
 
                 if (adf.ATC != null)
                 {
-                    jsonData.TLV.Add(DecodeTLV(adf.ATC));
+                    dataObject = DecodeTLV(adf.ATC);
+                    if (dataObject != null)
+                    {
+                        jsonData.TLV.Add(dataObject);
+                    }
                 }
 
                 if (adf.LastOnlineATCRegister != null)
                 {
-                    jsonData.TLV.Add(DecodeTLV(adf.LastOnlineATCRegister));
+                    dataObject = DecodeTLV(adf.LastOnlineATCRegister);
+                    if (dataObject != null)
+                    {
+                        jsonData.TLV.Add(dataObject);
+                    }
                 }
 
                 if (adf.PinTryCounter != null)
                 {
-                    jsonData.TLV.Add(DecodeTLV(adf.PinTryCounter));
+                    dataObject = DecodeTLV(adf.PinTryCounter);
+                    if (dataObject != null)
+                    {
+                        jsonData.TLV.Add(dataObject);
+                    }
                 }
 
                 if (adf.LogEntry != null)
                 {
-                    jsonData.TLV.Add(DecodeTLV(adf.LogEntry));
+                    dataObject = DecodeTLV(adf.LogEntry);
+                    if (dataObject != null)
+                    {
+                        jsonData.TLV.Add(dataObject);
+                    }
                 }
 
                 if (adf.LogFormat != null)
                 {
-                    jsonData.TLV.Add(DecodeTLV(adf.LogFormat));
+                    dataObject = DecodeTLV(adf.LogFormat);
+                    if (dataObject != null)
+                    {
+                        jsonData.TLV.Add(dataObject);
+                    }
                 }
             }
 
             jsonData.CPLC = DataProcessor.ByteArrayToHexString(CardData.CPLC, true);
 
+            string serializedData = JsonConvert.SerializeObject(jsonData).Replace("{},", string.Empty).Replace(",{}", string.Empty);
+
+            jsonData = new JsonData();
             ClearCardData();
 
-            return JsonConvert.SerializeObject(jsonData);
+            return serializedData;
         }
 
         /// <summary>
@@ -1058,7 +1244,7 @@ namespace EMVCardReader
                         };
                 }
             }
-            return new object();
+            return null;
         }
 
         /// <summary>
@@ -1252,6 +1438,16 @@ namespace EMVCardReader
             };
 
             return isoReader.Transmit(command);
+        }
+
+        /// <summary>
+        /// Checks if the response is successful, i.e., 90 00.
+        /// </summary>
+        /// <param name="response">APDU response</param>
+        /// <returns>True if response is successful, else false</returns>
+        private static bool IsSuccess(Response response)
+        {
+            return response.SW1 == 0x90 && response.SW2 == 0x00;
         }
     }
 }
