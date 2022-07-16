@@ -1439,15 +1439,5 @@ namespace EMVCardReader
 
             return isoReader.Transmit(command);
         }
-
-        /// <summary>
-        /// Checks if the response is successful, i.e., 90 00.
-        /// </summary>
-        /// <param name="response">APDU response</param>
-        /// <returns>True if response is successful, else false</returns>
-        private static bool IsSuccess(Response response)
-        {
-            return response.SW1 == 0x90 && response.SW2 == 0x00;
-        }
     }
 }
