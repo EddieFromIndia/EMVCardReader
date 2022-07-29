@@ -1,4 +1,5 @@
-﻿using EMVCardReader.Database;
+﻿using EMVCardReader.Data;
+using EMVCardReader.Database;
 using EMVCardReader.Models;
 using Great.EmvTags;
 using Newtonsoft.Json;
@@ -8,6 +9,9 @@ using PCSC.Iso7816;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace EMVCardReader
 {
@@ -258,8 +262,37 @@ namespace EMVCardReader
                         }
                         break;
 
-                    // Exit application
+                    //Read EID Card
                     case "5":
+                        if (string.IsNullOrEmpty(SelectedReader))
+                        {
+                            Console.WriteLine();
+                            Console.WriteLine("There is no such card reader.");
+                            Console.WriteLine();
+                        }
+                        {
+                            Console.WriteLine();
+                            Console.Write("Reading eID data. Please wait...");
+
+                            try
+                            {
+                                string data = ReadEIDData();
+
+                                Console.WriteLine();
+                                Console.WriteLine(data);
+                                Console.WriteLine();
+                            }
+                            catch (Exception e)
+                            {
+                                Console.WriteLine();
+                                Console.WriteLine(e.Message);
+                                Console.WriteLine();
+                            }
+                        }
+                        break;
+
+                    // Exit application
+                    case "6":
                         return 0;
 
                     default:
@@ -286,7 +319,8 @@ namespace EMVCardReader
             Console.WriteLine("[2] Check if a card is inserted in the reader.");
             Console.WriteLine("[3] Check card type.");
             Console.WriteLine("[4] Get card details.");
-            Console.WriteLine("[5] Exit application.");
+            Console.WriteLine("[5] Read eID card data.");
+            Console.WriteLine("[6] Exit application.");
             Console.WriteLine();
             Console.Write("Choose an action: ");
             return Console.ReadLine();
@@ -1438,6 +1472,124 @@ namespace EMVCardReader
             };
 
             return isoReader.Transmit(command);
+        }
+
+
+
+
+
+
+        private static string ReadEIDData()
+        {
+            using (ISCardContext context = ContextFactory.Instance.Establish(SCardScope.System))
+            {
+                using (IsoReader isoReader = new IsoReader(context, SelectedReader, SCardShareMode.Shared, SCardProtocol.Any, false))
+                {
+                    Dictionary<byte, string> addressData = ReadFile(isoReader, Commands.ADDRESS_FILE_LOCATION, EidTags.ADDRESS_TAGS);
+                    Dictionary<byte, string> identityData = ReadFile(isoReader, Commands.IDENTITY_FILE_LOCATION, EidTags.IDENTITY_TAGS);
+
+                    DateTime? dateOfBirth = EidDateConverter.GetDateTime(identityData[EidTags.ID_BIRTH_DATE]);
+
+                    EidDataModel eidData = new EidDataModel
+                    {
+                        FullName = $"{identityData[EidTags.ID_FIRST_NAME]} {identityData[EidTags.ID_LAST_NAME]}",
+                        PlaceOfBirth = identityData[EidTags.ID_BIRTH_LOCATION],
+                        DateOfBirth = dateOfBirth.Value.ToString("dd/MM/yyyy"),
+                        Gender = identityData[EidTags.ID_SEX],
+                        Nationality = identityData[EidTags.ID_NATIONALITY],
+                        NationalNumber = identityData[EidTags.ID_NATIONAL_NUMBER],
+                        Address = $"{addressData[EidTags.ADDRESS_STREET_NUMBER]} {addressData[EidTags.ADDRESS_ZIP_CODE]} {addressData[EidTags.ADDRESS_MUNICIPALITY]}"
+                    };
+
+                    return JsonConvert.SerializeObject(eidData);
+                }
+            }
+            
+        }
+
+        private static Dictionary<byte, string> ReadFile(IsoReader isoReader, byte[] fileLocation, IEnumerable<byte> tags)
+        {
+            Response response = SelectFileForEIDCommand(isoReader, fileLocation);
+            if (!(response.SW1 == 0x90 && response.SW2 == 0x00))
+            {
+                return null;
+            }
+
+            Response data = ReadBinaryForEIDCommand(isoReader);
+
+            if (data.SW1 == 0x6C && data.SW2 != 0x00)
+            {
+                data = ReadBinaryForEIDCommand(isoReader, data.SW2);
+            }
+
+            if (data.SW1 == 0x90 && data.SW2 == 0x00)
+            {
+                return ReadData(data.GetData(), tags.ToList());
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// SELECT file APDU command for eIDs.
+        /// </summary>
+        /// <param name="isoReader">The instance of the currently used ISO/IEC 7816 compliant reader</param>
+        /// <param name="data">Data to be sent as a part of the command</param>
+        /// <returns>APDU response of the command</returns>
+        private static Response SelectFileForEIDCommand(IsoReader isoReader, byte[] data)
+        {
+            CommandApdu command = new CommandApdu(IsoCase.Case3Short, isoReader.ActiveProtocol)
+            {
+                CLA = 0x00,
+                Instruction = InstructionCode.SelectFile,
+                P1 = 0x08,
+                P2 = 0x0C,
+                Data = data
+            };
+
+            return isoReader.Transmit(command);
+        }
+
+        /// <summary>
+        /// READ RECORD APDU command for eIDs.
+        /// </summary>
+        /// <param name="isoReader">The instance of the currently used ISO/IEC 7816 compliant reader</param>
+        /// <param name="le">The expected length (Le) field of the APDU command. Default = 0</param>
+        /// <returns>APDU response of the command</returns>
+        private static Response ReadBinaryForEIDCommand(IsoReader isoReader, byte le = 0x00)
+        {
+            CommandApdu command = new CommandApdu(IsoCase.Case2Short, isoReader.ActiveProtocol)
+            {
+                CLA = 0x00,
+                Instruction = InstructionCode.ReadBinary,
+                P1 = 0x00,
+                P2 = 0x00,
+                Le = le
+            };
+
+            return isoReader.Transmit(command);
+        }
+
+        private static Dictionary<byte, string> ReadData(byte[] rawData, List<byte> tags)
+        {
+            var data = tags.ToDictionary(k => k, v => "");
+            int idx = 0; //we start at 0 :-)
+            while (idx < rawData.Length)
+            {
+                byte tag = rawData[idx]; //at this location we have a Tag
+                idx++;
+                var length = rawData[idx]; //the next position holds the length of the data
+                idx++;  //start of the data
+                if (tags.Contains(tag)) //this is a tag we are interested in
+                {
+                    var res = new byte[length]; //create array to put data of this tag in. We know the length
+                    Array.Copy(rawData, idx, res, 0, length); //fill
+                    var value = Encoding.UTF8.GetString(res); //convert to string
+                    data[tag] = value; //put the string value we read in the data dictionary
+                }
+                idx += length; //moving on, skipping the length of data we just read
+            }
+            return data;
         }
     }
 }

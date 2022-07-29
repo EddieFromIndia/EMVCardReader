@@ -237,10 +237,14 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Database\Commands.cs" />
+    <Compile Include="Database\EidTags.cs" />
+    <Compile Include="Data\EidDateConverter.cs" />
     <Compile Include="Models\ADFModel.cs" />
     <Compile Include="Database\AIDList.cs" />
     <Compile Include="Data\CardData.cs" />
     <Compile Include="Data\DataProcessor.cs" />
+    <Compile Include="Models\JsonModels\EidDataModel.cs" />
     <Compile Include="Models\JsonData.cs" />
     <Compile Include="Models\JsonModels\ADF.cs" />
     <Compile Include="Models\JsonModels\AdditionalData.cs" />
